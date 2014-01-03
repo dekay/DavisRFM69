@@ -1,0 +1,31 @@
+#######################################
+# Syntax Coloring Map for Davis
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+#######################################
+# Instances (KEYWORD2)
+#######################################
+DavisRFM69	KEYWORD2
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+initialize	KEYWORD2
+setChannel	KEYWORD2
+hop	KEYWORD2
+interruptHandler	KEYWORD2
+reverseBits KEYWORD2
+crc16_ccitt KEYWORD2
+#######################################
+# Constants (LITERAL1)
+#######################################
+FRF	LITERAL1
+
+#######################################
+# Variables/Volatiles (LITERAL2)
+#######################################
+hopIndex	LITERAL2
