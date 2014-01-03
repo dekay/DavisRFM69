@@ -62,7 +62,7 @@ The first field is the channel number, the data is the eight data bytes sent by 
 Note the first packet has a bad CRC as noted above.
 
 ##Blog Writeup
-In the works...
+[Right here](http://madscientistlabs.blogspot.ca/2014/01/more-than-one-way-to-skin-cat.html), along with the best GIF ever.
 
 ##Why
 I started playing around with my VP2 Wireless console when I discovered its little expansion port tucked away in the back.  Its purpose is primarily for connection of an exorbitantly priced datalogger that is little more than a one dollar flash chip.  After figuring out how to connect [first a serial interface](http://madscientistlabs.blogspot.ca/2011/01/davis-weatherlink-software-not-required.html) and then [building my own datalogger](http://madscientistlabs.blogspot.ca/2011/10/build-your-own-davis-console-datalogger.html), I figured out the [wireless protocol between the ISS and the console](http://madscientistlabs.blogspot.ca/2012/03/first-you-get-sugar.html) and put together the first standalone receive using an [IM-ME Pretty Pink Pager](http://madscientistlabs.blogspot.ca/2012/04/achievement-unlocked-im-me-weather.html).
