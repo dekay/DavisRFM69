@@ -43,7 +43,7 @@ I am aware of these issues:
 
 Please let me know if you find other issues.
 
-My DavisRFM69 library subclasses the RFM69 library and overrides a couple of functions.  I've made some trivial changes to the LowPowerLab's RFM69 library in the process and have issued a pull request.  In the meantime, you'll want to use [my forked RFM69 library](https://github.com/dekay/RFM69) instead of LowPowerLab's.
+My DavisRFM69 library subclasses the RFM69 library and overrides a couple of functions.  I've made some trivial changes to the LowPowerLab's RFM69 library in the process ~~and have issued a pull request.  In the meantime, you'll want to use [my forked RFM69 library](https://github.com/dekay/RFM69) instead of LowPowerLab's.~~that have now been merged into [LowPowerLab's master branch](https://github.com/LowPowerLab/RFM69/tree/master).
 
 ##Sample Usage
 [ISSRx](https://github.com/dekay/DavisRFM69/blob/master/Examples/ISSRx/ISSRx.ino) is an example that uses the library to listen in on a Davis ISS.  A new line of data spits out every 2.5 seconds, assuming the ISS you are listening to is on Channel 1 (the packet rate slows by 62.5 ms for every Channel ID higher than 1).
