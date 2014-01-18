@@ -42,7 +42,8 @@ bool DavisRFM69::initialize(byte freqBand, byte nodeID, byte networkID)
     /* 0x23 & 0x24 RSSI MSB and LSB values, respectively */
     /* 0x25 */ { REG_DIOMAPPING1, RF_DIOMAPPING1_DIO0_01 }, //DIO0 is the only IRQ we're using
     /* 0x26 RegDioMapping2 */
-    /* 0x27 & 0x28 RegIRQFlags1 and 2, respectively */		
+    /* 0x27 RegIRQFlags1 */
+    /* 0x28 */ { REG_IRQFLAGS2, RF_IRQFLAGS2_FIFOOVERRUN }, // Reset the FIFOs. Fixes a problem I had with bad first packet.
     /* 0x29 */ { REG_RSSITHRESH, 200 }, //must be set to dBm = (-Sensitivity / 2) - default is 0xE4=228 so -114dBm
     /* 0x2a & 0x2b RegRxTimeout1 and 2, respectively */
     /* 0x2c RegPreambleMsb - use zero default */
@@ -106,6 +107,39 @@ void DavisRFM69::interruptHandler() {
     setMode(RF69_MODE_RX);
   }
   RSSI = readRSSI();
+}
+
+void DavisRFM69::send(byte toAddress, const void* buffer, byte bufferSize, bool requestACK)
+{
+  writeReg(REG_PACKETCONFIG2, (readReg(REG_PACKETCONFIG2) & 0xFB) | RF_PACKET2_RXRESTART); // avoid RX deadlocks
+  while (!canSend()) receiveDone();
+  sendFrame(toAddress, buffer, bufferSize, requestACK, false);
+}
+
+void DavisRFM69::sendFrame(byte toAddress, const void* buffer, byte bufferSize, bool requestACK, bool sendACK)
+{
+  setMode(RF69_MODE_STANDBY); //turn off receiver to prevent reception while filling fifo
+  while ((readReg(REG_IRQFLAGS1) & RF_IRQFLAGS1_MODEREADY) == 0x00); // Wait for ModeReady
+  writeReg(REG_DIOMAPPING1, RF_DIOMAPPING1_DIO0_00); // DIO0 is "Packet Sent"
+  if (bufferSize > MAX_DATA_LEN) bufferSize = MAX_DATA_LEN;
+
+  unsigned int crc = crc16_ccitt((volatile byte *)buffer, 6);
+  //write to FIFO
+  select();
+  SPI.transfer(REG_FIFO | 0x80);
+  
+  for (byte i = 0; i < bufferSize; i++)
+    SPI.transfer(reverseBits(((byte*)buffer)[i]));
+
+  SPI.transfer(reverseBits(crc >> 8));
+  SPI.transfer(reverseBits(crc & 0xff));
+  unselect();
+
+  /* no need to wait for transmit mode to be ready since its handled by the radio */
+  setMode(RF69_MODE_TX);
+  while (digitalRead(_interruptPin) == 0); //wait for DIO0 to turn HIGH signalling transmission finish
+  //while (readReg(REG_IRQFLAGS2) & RF_IRQFLAGS2_PACKETSENT == 0x00); // Wait for ModeReady
+  setMode(RF69_MODE_STANDBY);
 }
 
 void DavisRFM69::setChannel(byte channel)

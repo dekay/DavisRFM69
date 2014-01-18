@@ -18,6 +18,7 @@ initialize	KEYWORD2
 setChannel	KEYWORD2
 hop	KEYWORD2
 interruptHandler	KEYWORD2
+sendFrame  KEYWORD2
 reverseBits KEYWORD2
 crc16_ccitt KEYWORD2
 #######################################

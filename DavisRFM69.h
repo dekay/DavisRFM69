@@ -13,6 +13,7 @@
 
 class DavisRFM69: public RFM69 {
   public:
+    void send(byte toAddress, const void* buffer, byte bufferSize, bool requestACK=false);
     static volatile byte hopIndex;
     bool initialize(byte freqBand, byte ID, byte networkID=1);
     void setChannel(byte channel);
@@ -21,6 +22,7 @@ class DavisRFM69: public RFM69 {
 
   protected:
     void virtual interruptHandler();
+    void sendFrame(byte toAddress, const void* buffer, byte size, bool requestACK=false, bool sendACK=false);
     byte reverseBits(byte b);
 };
 
@@ -28,8 +30,8 @@ class DavisRFM69: public RFM69 {
 // used by Davis in frequency hopping
 static const uint8_t __attribute__ ((progmem)) FRF[51][3] =
 {
-	{0xE3, 0xDA, 0x7C},
-	{0xE1, 0x98, 0x71},
+  {0xE3, 0xDA, 0x7C},
+  {0xE1, 0x98, 0x71},
 	{0xE3, 0xFA, 0x92},
 	{0xE6, 0xBD, 0x01},
 	{0xE4, 0xBB, 0x4D},
