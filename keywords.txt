@@ -7,12 +7,22 @@
 #######################################
 
 #######################################
-# Instances (KEYWORD2)
+# DHTxx Instances (KEYWORD1)
 #######################################
-DavisRFM69	KEYWORD2
+DHTxx	KEYWORD1
 
 #######################################
-# Methods and Functions (KEYWORD2)
+# DavisRFM69 Instances (KEYWORD1)
+#######################################
+DavisRFM69	KEYWORD1
+
+#######################################
+# DHTxx Methods and Functions (KEYWORD2)
+#######################################
+reading	KEYWORD2
+
+#######################################
+# DavisRFM69 Methods and Functions (KEYWORD2)
 #######################################
 initialize	KEYWORD2
 setChannel	KEYWORD2

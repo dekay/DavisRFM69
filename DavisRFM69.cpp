@@ -1,11 +1,15 @@
-// **********************************************************************************
-// Driver definition for HopeRF RFM69W/RFM69HW, Semtech SX1231/1231H
-// **********************************************************************************
-// Creative Commons Attrib Share-Alike License
-// You are free to use/extend this library but please abide with the CCSA license:
+// Driver implementation for HopeRF RFM69W/RFM69HW, Semtech SX1231/1231H used for
+// compatibility with the frequency hopped, spread spectrum signals from a Davis Instrument
+// wireless Integrated Sensor Suite (ISS)
+//
+// This is part of the DavisRFM69 library from https://github.com/dekay/DavisRFM69
+// (C) DeKay 2014 dekaymail@gmail.com
+//
+// As I consider this to be a derived work from the RFM69W library from LowPowerLab,
+// it is released under the same Creative Commons Attrib Share-Alike License
+// You are free to use/extend this library but please abide with the CC-BY-SA license:
 // http://creativecommons.org/licenses/by-sa/3.0/
-// 2014-01-03 (C) DeKay (dekaymail@gmail.com)
-// **********************************************************************************
+
 #include <DavisRFM69.h>
 #include <../RFM69/RFM69registers.h>
 #include <SPI.h>
@@ -78,7 +82,6 @@ bool DavisRFM69::initialize(byte freqBand, byte nodeID, byte networkID)
     writeReg(CONFIG[i][0], CONFIG[i][1]);
 
   encrypt(0);		      // Disable encryption to get to a known state between resets
-
 
   setHighPower(_isRFM69HW); //called regardless if it's a RFM69W or RFM69HW
   setMode(RF69_MODE_STANDBY);

@@ -1,13 +1,18 @@
-// **********************************************************************************
-// Driver definition for HopeRF RFM69W/RFM69HW, Semtech SX1231/1231H
-// **********************************************************************************
-// Creative Commons Attrib Share-Alike License
+// Driver definition for HopeRF RFM69W/RFM69HW, Semtech SX1231/1231H used for
+// compatibility with the frequency hopped, spread spectrum signals from a Davis Instrument
+// wireless Integrated Sensor Suite (ISS)
+//
+// This is part of the DavisRFM69 library from https://github.com/dekay/DavisRFM69
+// (C) DeKay 2014 dekaymail@gmail.com
+//
+// As I consider this to be a derived work from the RFM69W library from LowPowerLab,
+// it is released under the same Creative Commons Attrib Share-Alike License
 // You are free to use/extend this library but please abide with the CC-BY-SA license:
 // http://creativecommons.org/licenses/by-sa/3.0/
-// 2014-01-03 (C) DeKay (dekaymail@gmail.com)
-// **********************************************************************************
+
 #ifndef DAVISRFM69_h
 #define DAVISRFM69_h
+#include <Davisdef.h>
 #include <Arduino.h>            //assumes Arduino IDE v1.0 or greater
 #include <../RFM69/RFM69.h>
 

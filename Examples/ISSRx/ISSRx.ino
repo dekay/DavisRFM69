@@ -4,9 +4,9 @@
 // passes through to the serial port.  This code retains some of the debugging 
 // functionality of the LowPowerLabs Gateway sketch, on which this code is based.
 //
-// DavisRFM69 Library and code by DeKay - dekaymail@gmail.com
-// Get the DavisRFM69 library from: https://github.com/dekay/DavisRFM69
-// RFM69 Library, code, and inspiration for this work by Felix Rusu - felix@lowpowerlab.com
+// This is part of the DavisRFM69 library from https://github.com/dekay/DavisRFM69
+// (C) DeKay 2014 dekaymail@gmail.com
+// Example released under the MIT License (http://opensource.org/licenses/mit-license.php)
 // Get the RFM69 and SPIFlash library at: https://github.com/LowPowerLab/
 //
 // This program has been developed on a Moteino R3 Arduino clone with integrated RFM69W 

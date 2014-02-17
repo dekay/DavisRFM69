@@ -28,22 +28,22 @@ This library is in its early stages but I wanted to get something functional out
 fitted with an RFM69W (Semtech SX1231/SX1231) transceiver module.
 
 ##Installation
-Install LowPowerLab's RFM69 library as described [on its Github page](https://github.com/LowPowerLab/RFM69).
+Install LowPowerLab's RFM69 library as described [on its Github page](https://github.com/LowPowerLab/RFM69).  You will also need to install his [SPIFlash library](https://github.com/LowPowerLab/SPIFlash) as well.
 
 Copy the content of this library to a folder called "DavisRFM69" in your Arduino library folder.  This will be a subfolder in your "Sketchbook location" specified in File>Preferences in the Arduino IDE.  See [this tutorial](http://learn.adafruit.com/arduino-tips-tricks-and-techniques/arduino-libraries) on Arduino libraries.
 
-Easier yet is to just "git clone" the RFM69 and DavisRFM69 code from within your Arduino "libraries" folder.
+Easier yet is to just "git clone" the RFM69, SPIFlash, and DavisRFM69 code from within your Arduino "libraries" folder.
 
 ##Miscellaneous / Possible Issues
 
 I am aware of these issues:
-- the first packet received after powerup on Channel 0 always has a bad CRC
-- the 42nd channel always has a bad CRC (WTH?)
-- error handling: there really isn't any yet
+- I get a spurious interrupt on startup
+- Reception could probably be better and more robust
+- Error handling: there really isn't any yet
 
 Please let me know if you find other issues.
 
-My DavisRFM69 library subclasses the RFM69 library and overrides a couple of functions.  I've made some trivial changes to the LowPowerLab's RFM69 library in the process ~~and have issued a pull request.  In the meantime, you'll want to use [my forked RFM69 library](https://github.com/dekay/RFM69) instead of LowPowerLab's.~~that have now been merged into [LowPowerLab's master branch](https://github.com/LowPowerLab/RFM69/tree/master).
+My DavisRFM69 library subclasses the RFM69 library and overrides a couple of functions.  I've made some trivial changes to the LowPowerLab's RFM69 library in the process that have now been merged into [LowPowerLab's master branch](https://github.com/LowPowerLab/RFM69/tree/master).
 
 ##Sample Usage
 [ISSRx](https://github.com/dekay/DavisRFM69/blob/master/Examples/ISSRx/ISSRx.ino) is an example that uses the library to listen in on a Davis ISS.  A new line of data spits out every 2.5 seconds, assuming the ISS you are listening to is on Channel 1 (the packet rate slows by 62.5 ms for every Channel ID higher than 1).
@@ -61,8 +61,12 @@ The first field is the channel number, the data is the eight data bytes sent by 
 
 Note the first packet has a bad CRC as noted above.
 
-##Blog Writeup
-[Right here](http://madscientistlabs.blogspot.ca/2014/01/more-than-one-way-to-skin-cat.html), along with the best GIF ever.
+[VP2](https://github.com/dekay/DavisRFM69/blob/master/Examples/VP2/VP2.ino) is an emulation of the Davis Vantage Pro2 console that works with Sandaysoft's Cumulus weather software.
+
+##Blog Writeups
+[ISS Reception](http://madscientistlabs.blogspot.ca/2014/01/more-than-one-way-to-skin-cat.html), along with the best GIF ever.
+
+[Davis Console Emulation](http://madscientistlabs.blogspot.ca/2014/02/build-your-own-davis-weather-station_17.html) combines ISS Reception capabilities along with hookups to sensors for indoor monitoring of temperature, pressure, and humidity.
 
 ##Why
 I started playing around with my VP2 Wireless console when I discovered its little expansion port tucked away in the back.  Its purpose is primarily for connection of an exorbitantly priced datalogger that is little more than a one dollar flash chip.  After figuring out how to connect [first a serial interface](http://madscientistlabs.blogspot.ca/2011/01/davis-weatherlink-software-not-required.html) and then [building my own datalogger](http://madscientistlabs.blogspot.ca/2011/10/build-your-own-davis-console-datalogger.html), I figured out the [wireless protocol between the ISS and the console](http://madscientistlabs.blogspot.ca/2012/03/first-you-get-sugar.html) and put together the first standalone receive using an [IM-ME Pretty Pink Pager](http://madscientistlabs.blogspot.ca/2012/04/achievement-unlocked-im-me-weather.html).
