@@ -156,7 +156,7 @@ void DavisRFM69::setChannel(byte channel)
 void DavisRFM69::hop()
 {
   hopIndex++;
-  if (hopIndex > 50) 
+  if (hopIndex > DAVIS_FREQ_TABLE_LENGTH - 1) 
   {
     hopIndex = 0;
   }

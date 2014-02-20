@@ -15,6 +15,14 @@
 // transceiver module.  Note that RFM12B-based modules will not work.  See the README
 // for more details.
 
+// Uncomment only one of the four #define's below.  This determines the frequency table the
+// code will use.  Note that only the US (actually North America) and EU frequencies are
+// defined at this time.  Australia and New Zealand are placeholders.
+#define DAVIS_FREQS_US true
+//#define DAVIS_FREQS_EU true
+//#define DAVIS_FREQS_AU true
+//#define DAVIS_FREQS_NZ true
+
 #include <RFM69.h>
 #include <DavisRFM69.h>
 #include <DHTxx.h>
@@ -24,11 +32,6 @@
 #include <Adafruit_BMP085.h>
 #include <SerialCommand.h>
 
-// Match frequency to the hardware version of the radio on your Moteino (uncomment one):
-// Note: Only the 915 MHz North American version is supported at this moment.
-//#define FREQUENCY     RF69_433MHZ
-//#define FREQUENCY     RF69_868MHZ
-#define FREQUENCY     RF69_915MHZ
 //#define IS_RFM69HW    //uncomment only for RFM69HW! Leave out if you have RFM69W!
 #define LED           9  // Moteinos have LEDs on D9
 #define SERIAL_BAUD   19200        // Davis console is 19200 by default
@@ -61,8 +64,8 @@ unsigned int packetStats[PACKET_STATS_LENGTH] = {0, 0, 0, 0 ,0};
 void setup() {
   Serial.begin(SERIAL_BAUD);
   delay(10);
-  radio.initialize(FREQUENCY,0,0);  // 0, 0 is nodeID and networkID, always zero in this implementation.
-  radio.setChannel(0);              // Channel is *not* set in the initialization. Do it right after.
+  radio.initialize(0,0,0);  // 0, 0, 0 is Frequency, nodeID and networkID, always zero in this implementation.
+  radio.setChannel(0);              // Frequency / Channel is *not* set in the initialization. Do it right after.
 #ifdef IS_RFM69HW
   radio.setHighPower(); //uncomment only for RFM69HW!
 #endif
