@@ -178,7 +178,7 @@ void loop() {
 
 // Read the data from the ISS and figure out what to do with it
 void processPacket() {
-  // Every packet has wind speed and direction in it
+  // Every packet has wind speed, direction, and battery status in it
   loopData[WIND_SPEED] = radio.DATA[1];
 #if 0
   Serial.print("Wind Speed: ");
@@ -201,6 +201,12 @@ void processPacket() {
   Serial.print(loopData[WIND_DIRECTION_LSB]);
   Serial.print("  Rx Byte 2: ");
   Serial.println(radio.DATA[2]);
+#endif
+
+  loopData[TRANSMITTER_BATTERY_STATUS] = (radio.DATA[0] & 0x8) >> 3;
+#if 0
+  Serial.print("Battery status: ");
+  Serial.println(loopData[TRANSMITTER_BATTERY_STATUS]);
 #endif
 
   // Now look at each individual packet. Mask off the four low order bits. The highest order bit of the
@@ -421,7 +427,6 @@ void cmdWake() {
 // This gets set as the default handler, and gets called when no other command matches.
 void cmdUnrecognized(const char *command) {
   printOk();
-  Serial.println("***");
 }
 
 //--- Print related support functions ---//
