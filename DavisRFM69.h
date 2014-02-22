@@ -100,7 +100,7 @@ static const uint8_t __attribute__ ((progmem)) FRF[DAVIS_FREQ_TABLE_LENGTH][3] =
   {0xE2, 0xF9, 0xAC},
   {0xE4, 0x7B, 0x0C},
   {0xE7, 0x5D, 0x98}
-}; 
+};
 #elif defined (DAVIS_FREQS_EU)
 #warning ** USING EUROPEAN FREQUENCY TABLE **
 #define DAVIS_FREQ_TABLE_LENGTH 5

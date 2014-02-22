@@ -40,7 +40,7 @@ bool DavisRFM69::initialize(byte freqBand, byte nodeID, byte networkID)
     /* 0x19 */ { REG_RXBW, RF_RXBW_DCCFREQ_010 | RF_RXBW_MANT_20 | RF_RXBW_EXP_4 }, // Use 25 kHz BW (BitRate < 2 * RxBw)
     /* 0x1A */ { REG_AFCBW, RF_RXBW_DCCFREQ_010 | RF_RXBW_MANT_20 | RF_RXBW_EXP_3 }, // Use double the bandwidth during AFC as reception
     /* 0x1B - 0x1D These registers are for OOK.  Not used */
-    /* 0x1E */ { REG_AFCFEI, RF_AFCFEI_AFCAUTOCLEAR_OFF | RF_AFCFEI_AFCAUTO_ON },
+    /* 0x1E */ { REG_AFCFEI, RF_AFCFEI_AFCAUTOCLEAR_ON | RF_AFCFEI_AFCAUTO_ON },
     /* 0x1F & 0x20 AFC MSB and LSB values, respectively */
     /* 0x21 & 0x22 FEI MSB and LSB values, respectively */
     /* 0x23 & 0x24 RSSI MSB and LSB values, respectively */
@@ -48,7 +48,7 @@ bool DavisRFM69::initialize(byte freqBand, byte nodeID, byte networkID)
     /* 0x26 RegDioMapping2 */
     /* 0x27 RegIRQFlags1 */
     /* 0x28 */ { REG_IRQFLAGS2, RF_IRQFLAGS2_FIFOOVERRUN }, // Reset the FIFOs. Fixes a problem I had with bad first packet.
-    /* 0x29 */ { REG_RSSITHRESH, 200 }, //must be set to dBm = (-Sensitivity / 2) - default is 0xE4=228 so -114dBm
+    /* 0x29 */ { REG_RSSITHRESH, 170 }, //must be set to dBm = (-Sensitivity / 2) - default is 0xE4=228 so -114dBm
     /* 0x2a & 0x2b RegRxTimeout1 and 2, respectively */
     /* 0x2c RegPreambleMsb - use zero default */
     /* 0x2d */ { REG_PREAMBLELSB, 4 }, // Davis has four preamble bytes 0xAAAAAAAA
@@ -74,10 +74,10 @@ bool DavisRFM69::initialize(byte freqBand, byte nodeID, byte networkID)
   SPI.setBitOrder(MSBFIRST);
   SPI.setClockDivider(SPI_CLOCK_DIV2); //max speed, except on Due which can run at system clock speed
   SPI.begin();
-  
+
   do writeReg(REG_SYNCVALUE1, 0xaa); while (readReg(REG_SYNCVALUE1) != 0xaa);
 	do writeReg(REG_SYNCVALUE1, 0x55); while (readReg(REG_SYNCVALUE1) != 0x55);
-  
+
   for (byte i = 0; CONFIG[i][0] != 255; i++)
     writeReg(CONFIG[i][0], CONFIG[i][1]);
 
@@ -87,7 +87,7 @@ bool DavisRFM69::initialize(byte freqBand, byte nodeID, byte networkID)
   setMode(RF69_MODE_STANDBY);
   while ((readReg(REG_IRQFLAGS1) & RF_IRQFLAGS1_MODEREADY) == 0x00); // Wait for ModeReady
   attachInterrupt(0, RFM69::isr0, RISING);
-  
+
   selfPointer = this;
   _address = 0; // Was nodeID in original implementation.  Not used here.
   return true;
@@ -101,7 +101,7 @@ void DavisRFM69::interruptHandler() {
     SPI.transfer(REG_FIFO & 0x7f);
     PAYLOADLEN = 8;
     DATALEN = 8;
-    
+
     for (byte i= 0; i < DATALEN; i++)
     {
       DATA[i] = reverseBits(SPI.transfer(0));
@@ -130,7 +130,7 @@ void DavisRFM69::sendFrame(byte toAddress, const void* buffer, byte bufferSize, 
   //write to FIFO
   select();
   SPI.transfer(REG_FIFO | 0x80);
-  
+
   for (byte i = 0; i < bufferSize; i++)
     SPI.transfer(reverseBits(((byte*)buffer)[i]));
 
@@ -155,8 +155,7 @@ void DavisRFM69::setChannel(byte channel)
 
 void DavisRFM69::hop()
 {
-  hopIndex++;
-  if (hopIndex > DAVIS_FREQ_TABLE_LENGTH - 1) 
+  if (++hopIndex > DAVIS_FREQ_TABLE_LENGTH - 1)
   {
     hopIndex = 0;
   }

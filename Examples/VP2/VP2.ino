@@ -149,18 +149,13 @@ void loop() {
     if (strmon) printStrm();
 #if 0
     Serial.print(radio.hopIndex);
-    Serial.print(" - ");
-    Serial.print("Data: ");
+    Serial.print(F(" - Data: "));
     for (byte i = 0; i < radio.DATALEN; i++) {
       Serial.print(radio.DATA[i], HEX);
-      Serial.print(" ");
+      Serial.print(F(" "));
     }
-    Serial.print("  RSSI: ");
-    Serial.print(radio.RSSI);
-    Serial.print("dBm   CRC: ");
-    unsigned int crc = radio.crc16_ccitt(radio.DATA, 6);
-    Serial.print(crc, HEX);
-    Serial.println();
+    Serial.print(F("  RSSI: "));
+    Serial.println(radio.RSSI);
 #endif
   }
 
