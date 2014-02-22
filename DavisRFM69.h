@@ -31,10 +31,10 @@ class DavisRFM69: public RFM69 {
     byte reverseBits(byte b);
 };
 
-// FRF_MSB, FRF_MID, and FRF_LSB for the 51 North American channels
+// FRF_MSB, FRF_MID, and FRF_LSB for the 51 North American channels & 5 European channels.
 // used by Davis in frequency hopping
-// #define DAVIS_FREQS_US
-#if DAVIS_FREQS_US
+
+#ifdef DAVIS_FREQS_US
 #warning ** USING NORTH AMERICAN FREQUENCY TABLE **
 #define DAVIS_FREQ_TABLE_LENGTH 51
 static const uint8_t __attribute__ ((progmem)) FRF[DAVIS_FREQ_TABLE_LENGTH][3] =
@@ -91,10 +91,11 @@ static const uint8_t __attribute__ ((progmem)) FRF[DAVIS_FREQ_TABLE_LENGTH][3] =
   {0xE4, 0x7B, 0x0C},
   {0xE7, 0x5D, 0x98}
 }; 
-#elif DAVIS_FREQS_EU
+#else
+#ifdef DAVIS_FREQS_EU
 #warning ** USING EUROPEAN FREQUENCY TABLE **
 #define DAVIS_FREQ_TABLE_LENGTH 5
-static const uint8_t __attribute__ ((progmem)) FRF[define DAVIS_FREQ_TABLE_LENGTH][3] =
+static const uint8_t __attribute__ ((progmem)) FRF[DAVIS_FREQ_TABLE_LENGTH][3] =
 {
   {0xD9, 0x4, 0x45},
   {0xD9, 0x13, 0x4},
@@ -102,13 +103,17 @@ static const uint8_t __attribute__ ((progmem)) FRF[define DAVIS_FREQ_TABLE_LENGT
   {0xD9, 0xB, 0xA4},
   {0xD9, 0x1A, 0x63}
 };
-  
-#elif DAVIS_FREQS_AU
+#else
+#ifdef DAVIS_FREQS_AU
 #error ** ERROR DAVIS FREQS FOR AU ARE NOT KNOWN AT THIS TIME. ONLY US & EU DEFINED **
-#elif DAVIS_FREQS_NZ
+#else
+#ifdef DAVIS_FREQS_NZ
 #error ** ERROR DAVIS FREQS FOR NZ ARE NOT KNOWN AT THIS TIME. ONLY US & EU DEFINED **
 #else
 #error ** ERROR DAVIS_FREQS MUST BE DEFINED AS ONE OF _US, _EU, _AZ, or NZ **
 #endif  // DAVIS_FREQS_US
+#endif  // DAVIS_FREQS_EU
+#endif  // DAVIS_FREQS_AU
+#endif  // DAVIS_FREQS_NZ
 
 #endif  // DAVISRFM_h

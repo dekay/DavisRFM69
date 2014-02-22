@@ -18,10 +18,10 @@
 // Uncomment only one of the four #define's below.  This determines the frequency table the
 // code will use.  Note that only the US (actually North America) and EU frequencies are
 // defined at this time.  Australia and New Zealand are placeholders.
-#define DAVIS_FREQS_US true
-//#define DAVIS_FREQS_EU true
-//#define DAVIS_FREQS_AU true
-//#define DAVIS_FREQS_NZ true
+#define DAVIS_FREQS_US
+//#define DAVIS_FREQS_EU
+//#define DAVIS_FREQS_AU
+//#define DAVIS_FREQS_NZ
 
 #include <RFM69.h>
 #include <DavisRFM69.h>
