@@ -10,6 +10,16 @@
 // You are free to use/extend this library but please abide with the CC-BY-SA license:
 // http://creativecommons.org/licenses/by-sa/3.0/
 
+// Uncomment ONE AND ONLY ONE of the four #define's below.  This determines the
+// frequency table the code will use.  Note that only the US (actually North
+// America) and EU frequencies are defined at this time.  Australia and New
+// Zealand are placeholders.  Note however that the frequencies for AU and NZ
+// are not known at this time.
+#define DAVIS_FREQS_US
+//#define DAVIS_FREQS_EU
+//#define DAVIS_FREQS_AU
+//#define DAVIS_FREQS_NZ
+
 #ifndef DAVISRFM69_h
 #define DAVISRFM69_h
 #include <Davisdef.h>
@@ -91,8 +101,7 @@ static const uint8_t __attribute__ ((progmem)) FRF[DAVIS_FREQ_TABLE_LENGTH][3] =
   {0xE4, 0x7B, 0x0C},
   {0xE7, 0x5D, 0x98}
 }; 
-#else
-#ifdef DAVIS_FREQS_EU
+#elif defined (DAVIS_FREQS_EU)
 #warning ** USING EUROPEAN FREQUENCY TABLE **
 #define DAVIS_FREQ_TABLE_LENGTH 5
 static const uint8_t __attribute__ ((progmem)) FRF[DAVIS_FREQ_TABLE_LENGTH][3] =
@@ -103,17 +112,12 @@ static const uint8_t __attribute__ ((progmem)) FRF[DAVIS_FREQ_TABLE_LENGTH][3] =
   {0xD9, 0xB, 0xA4},
   {0xD9, 0x1A, 0x63}
 };
-#else
-#ifdef DAVIS_FREQS_AU
+#elif defined (DAVIS_FREQS_AU)
 #error ** ERROR DAVIS FREQS FOR AU ARE NOT KNOWN AT THIS TIME. ONLY US & EU DEFINED **
-#else
-#ifdef DAVIS_FREQS_NZ
+#elif defined (DAVIS_FREQS_NZ)
 #error ** ERROR DAVIS FREQS FOR NZ ARE NOT KNOWN AT THIS TIME. ONLY US & EU DEFINED **
 #else
 #error ** ERROR DAVIS_FREQS MUST BE DEFINED AS ONE OF _US, _EU, _AZ, or NZ **
-#endif  // DAVIS_FREQS_US
-#endif  // DAVIS_FREQS_EU
-#endif  // DAVIS_FREQS_AU
-#endif  // DAVIS_FREQS_NZ
+#endif  // DAVIS_FREQS
 
 #endif  // DAVISRFM_h

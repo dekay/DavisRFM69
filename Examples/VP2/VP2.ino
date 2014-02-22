@@ -15,14 +15,6 @@
 // transceiver module.  Note that RFM12B-based modules will not work.  See the README
 // for more details.
 
-// Uncomment only one of the four #define's below.  This determines the frequency table the
-// code will use.  Note that only the US (actually North America) and EU frequencies are
-// defined at this time.  Australia and New Zealand are placeholders.
-#define DAVIS_FREQS_US
-//#define DAVIS_FREQS_EU
-//#define DAVIS_FREQS_AU
-//#define DAVIS_FREQS_NZ
-
 #include <RFM69.h>
 #include <DavisRFM69.h>
 #include <DHTxx.h>
@@ -31,6 +23,9 @@
 #include <Wire.h>
 #include <Adafruit_BMP085.h>
 #include <SerialCommand.h>
+
+// NOTE: *** One of DAVIS_FREQS_US, DAVIS_FREQS_EU, DAVIS_FREQS_AU, or
+// DAVIS_FREQS_NZ MUST be defined at the top of DavisRFM69.h ***
 
 //#define IS_RFM69HW    //uncomment only for RFM69HW! Leave out if you have RFM69W!
 #define LED           9  // Moteinos have LEDs on D9
