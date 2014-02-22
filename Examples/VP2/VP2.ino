@@ -11,7 +11,7 @@
 // Example released under the MIT License (http://opensource.org/licenses/mit-license.php)
 // Get the RFM69 and SPIFlash library at: https://github.com/LowPowerLab/
 
-// This program has been developed on a Moteino R3 Arduino clone with integrated RFM69W 
+// This program has been developed on a Moteino R3 Arduino clone with integrated RFM69W
 // transceiver module.  Note that RFM12B-based modules will not work.  See the README
 // for more details.
 
@@ -33,9 +33,9 @@
 #define SENSOR_POLL_INTERVAL 5000  // Read indoor sensors every minute. Console uses 60 seconds
 
 #define DHT_DATA_PIN  4  // Use pin D4 to talk to the DHT22
-#define LATITUDE -1071
-#define LONGITUDE 541
-#define ELEVATION 800
+#define LATITUDE -1071   // Station latitude in tenths of degrees East
+#define LONGITUDE 541    // Station longitude in tenths of degrees North
+#define ELEVATION 800    // Station height above sea level in feet
 
 boolean strmon = false;      // Print the packet when received?
 DavisRFM69 radio;
@@ -64,7 +64,7 @@ void setup() {
 #ifdef IS_RFM69HW
   radio.setHighPower(); //uncomment only for RFM69HW!
 #endif
-#if 0  
+#if 0
   if (flash.initialize())
     Serial.println(F("SPI Flash Init OK!"));
   else
@@ -72,8 +72,7 @@ void setup() {
 #endif
   if (!bmp.begin()) {
     Serial.println(F("Could not find a valid BMP085 sensor, check wiring!"));
-    while (1) {
-    }
+    while (1) { }
   }
 
   // Setup callbacks for SerialCommand commands
@@ -114,42 +113,42 @@ void setup() {
 // - Wind speed 10 minute average every minute
 
 long lastPeriod = -1;
-boolean lastGood = false;  // Was the last packet we received a good one?
+long lastRxTime = 0;
+byte hopCount = 0;
+unsigned int packetInterval = 2555;
 
 void loop() {
   sCmd.readSerial();     // Process serial commands
 
   int currPeriod = millis()/SENSOR_POLL_INTERVAL;
 
-  if (currPeriod != lastPeriod)
-  {  
+  if (currPeriod != lastPeriod) {
     lastPeriod=currPeriod;
     readInsideTempHum();
     readPressure();
   }
 
-  // TODO: Missed packets and number of resyncs are not calculated yet.  Always zero.
-  if (radio.receiveDone())
-  {
+  // The check for a zero CRC value indicates a bigger problem that will need
+  // fixing, but it needs to stay until the fix is in.
+  // TODO Reset the packet statistics at midnight once I get my clock module.
+  if (radio.receiveDone()) {
     packetStats[PACKETS_RECEIVED]++;
-    if (strmon)
-      printStrm();
-
-    // TODO Reset the packet statistics at midnight once I get my clock module
     unsigned int crc = radio.crc16_ccitt(radio.DATA, 6);
-    //if (crc == ((radio.DATA[6] << 8) + radio.DATA[7])) {
-    if (crc == (word(radio.DATA[6], radio.DATA[7]))) {
+    if ((crc == (word(radio.DATA[6], radio.DATA[7]))) && (crc != 0)) {
       processPacket();
       packetStats[RECEIVED_STREAK]++;
-    } 
-    else {
-      lastGood = false;
+      hopCount = 1;
+      lastRxTime = millis();
+      radio.hop();
+      blink(LED,3);
+    } else {
       packetStats[CRC_ERRORS]++;
       packetStats[RECEIVED_STREAK] = 0;
     }
 
+    if (strmon) printStrm();
 #if 0
-    Serial.print(radio.hopIndex); 
+    Serial.print(radio.hopIndex);
     Serial.print(" - ");
     Serial.print("Data: ");
     for (byte i = 0; i < radio.DATALEN; i++) {
@@ -163,9 +162,17 @@ void loop() {
     Serial.print(crc, HEX);
     Serial.println();
 #endif
-    radio.hop();
+  }
 
-    blink(LED,3);
+  // If a packet was not received at the expected time, hop the radio anyway
+  // in an attempt to keep up.  Give up after 25 failed attempts.  Keep track
+  // of packet stats as we go.  I consider a consecutive string of missed
+  // packets to be a single resync.  Thx to Kobuki for this algorithm.
+  if ((hopCount > 0) && ((millis() - lastRxTime) > (hopCount * packetInterval + 200))) {
+    packetStats[PACKETS_MISSED]++;
+    if (hopCount == 1) packetStats[NUM_RESYNCS]++;
+    if (++hopCount > 25) hopCount = 0;
+    radio.hop();
   }
 }
 
@@ -239,14 +246,13 @@ void processPacket() {
 // Indoor temperature and humidity is read once per minute
 void readInsideTempHum() {
   int insideTempF, insideTempC, insideHumidity;
-  if (tempHum.reading(insideTempC, insideHumidity, true))
-  {
+  if (tempHum.reading(insideTempC, insideHumidity, true)) {
     // Temperature and humidity are returned in tenths of a deg C and tenths of a percent, respectively
     // Values out of the console are tenths of a deg F and integer percent values.  PITA.
     insideTempF = insideTempC*1.8 + 320;
     loopData[INSIDE_TEMPERATURE_MSB] =highByte(insideTempF);
     loopData[INSIDE_TEMPERATURE_LSB] =lowByte(insideTempF);
-    loopData[INSIDE_HUMIDITY] = (insideHumidity + 5) * 0.1;  // Round the reading 
+    loopData[INSIDE_HUMIDITY] = (insideHumidity + 5) * 0.1;  // Round the reading
 #if 0
     Serial.print(F("Inside TempF: "));
     Serial.print(insideTempF);
@@ -318,7 +324,7 @@ void cmdEebrd() {
   byte response[2] = {0, 0};
   byte responseLength = 0;
   bool validCommand = true;
-  
+
   cmdMemLocation = sCmd.next();
   cmdNumBytes = sCmd.next();
   if ((cmdMemLocation != NULL) && (cmdNumBytes != NULL)) {
@@ -342,7 +348,7 @@ void cmdEebrd() {
       validCommand = false;
       printNack();
     }
-    
+
     if (validCommand) {
       unsigned int crc = radio.crc16_ccitt(response, responseLength);
       printAck();
@@ -360,8 +366,7 @@ void cmdEebrd() {
 void cmdHiLows() {
   byte count = 0;
   printAck();
-  for (int i = 0; i < HI_LOWS_LENGTH + 2; i++)
-    Serial.write(0);
+  for (int i = 0; i < HI_LOWS_LENGTH + 2; i++) Serial.write(0);
 }
 
 void cmdLoop() {
@@ -371,9 +376,7 @@ void cmdLoop() {
   unsigned int crc = radio.crc16_ccitt(loopData, LOOP_PACKET_LENGTH - 2);
   loopData[CRC_MSB]=highByte(crc);
   loopData[CRC_LSB]=lowByte(crc);
-  for (byte i = 0; i < LOOP_PACKET_LENGTH; i++) {
-    Serial.write(loopData[i]);
-  }
+  for (byte i = 0; i < LOOP_PACKET_LENGTH; i++) Serial.write(loopData[i]);
 }
 
 void cmdNver() {
@@ -413,7 +416,7 @@ void cmdVer() {
 
 void cmdWake() {
   Serial.print(F("\n\r"));
-}  
+}
 
 // This gets set as the default handler, and gets called when no other command matches.
 void cmdUnrecognized(const char *command) {
@@ -431,11 +434,11 @@ void printNack() {
 }
 
 // From http://jeelabs.org/2011/05/22/atmega-memory-use/
-int printFreeRam() {
-  extern int __heap_start, *__brkval; 
+void printFreeRam() {
+  extern int __heap_start, *__brkval;
   int v;
   Serial.print(F("Free mem: "));
-  Serial.println((int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval)); 
+  Serial.println((int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval));
 }
 
 void printOk() {
