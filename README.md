@@ -5,7 +5,7 @@ By DeKay (dekaymail@gmail.com)
 Creative Commons Attribribution Share-Alike License
 http://creativecommons.org/licenses/by-sa/3.0/
 
-This library is an extension to [LowPowerLab's RFM69 library](https://github.com/LowPowerLab/RFM69) that enables reception of weather data from a Davis Instruments Integrated Sensor Suite (ISS) weather station.
+This library is a modified version of the [LowPowerLab's RFM69 library](https://github.com/LowPowerLab/RFM69) that enables reception of weather data from a Davis Instruments Integrated Sensor Suite (ISS) weather station.
 
 ##Background
 The Davis Instruments ISS is a solar powered and battery-backed set of outdoor weather sensors monitored by a PIC microcontroller.  It uses a TI CC1020 RF Transmitter chip to send the weather data it collects back to a Davis Vantage VP2 or Vantage Vue console located indoors.  The ISS transmissions have been reverse engineered, and this has allowed receivers based on the TI CC1110 chip (amongst others) to receive its transmissions.
@@ -24,49 +24,25 @@ The new kid on the block is the RFM69 module from HopeRF.  This module is inexpe
 ## Features
 This library sniffs the wireless packets transmitted from a Davis ISS.  Other features are on the drawing board.  After all, why just receive?
 
-This library is in its early stages but I wanted to get something functional out there.  It has been developed on a Moteino R3 [(see here for the new R4 version)](http://lowpowerlab.com/shop/Moteino-R4)
+This library is in its early stages but I wanted to get something functional out there.  Churn should be expected for the next little while.
+
+This library has been developed on a Moteino R3 [(see here for the new R4 version)](http://lowpowerlab.com/shop/Moteino-R4)
 fitted with an RFM69W (Semtech SX1231/SX1231) transceiver module.
 
 ##Installation
-Install LowPowerLab's RFM69 library as described [on its Github page](https://github.com/LowPowerLab/RFM69).  You will also need to install his [SPIFlash library](https://github.com/LowPowerLab/SPIFlash) as well.
-
-Copy the content of this library to a folder called "DavisRFM69" in your Arduino library folder.  This will be a subfolder in your "Sketchbook location" specified in File>Preferences in the Arduino IDE.  See [this tutorial](http://learn.adafruit.com/arduino-tips-tricks-and-techniques/arduino-libraries) on Arduino libraries.
-
-Easier yet is to just "git clone" the RFM69, SPIFlash, and DavisRFM69 code from within your Arduino "libraries" folder.
+[See this blog post](http://madscientistlabs.blogspot.ca/2014/02/build-your-own-davis-weather-station_17.html) where I combines ISS Reception capabilities along with hookups to sensors for indoor monitoring of temperature, pressure, and humidity.  Note that this code no longer requires the installation of [LowPowerLab's RFM69 library](https://github.com/LowPowerLab/RFM69) discussed in that post, but you will still need to install his [SPIFlash library](https://github.com/LowPowerLab/SPIFlash).
 
 ##Miscellaneous / Possible Issues
 
-I am aware of these issues:
-- I get a spurious interrupt on startup
-- Reception could probably be better and more robust
-- Error handling: there really isn't any yet
-
-Please let me know if you find other issues.
-
-My DavisRFM69 library subclasses the RFM69 library and overrides a couple of functions.  I've made some trivial changes to the LowPowerLab's RFM69 library in the process that have now been merged into [LowPowerLab's master branch](https://github.com/LowPowerLab/RFM69/tree/master).
+Reception quality has been greatly improved in this release.  There looks to be a bug where the hop-ahead code has broken, but I expect that will be fixed soon.  Please let me know if you find other issues.
 
 ##Sample Usage
-[ISSRx](https://github.com/dekay/DavisRFM69/blob/master/Examples/ISSRx/ISSRx.ino) is an example that uses the library to listen in on a Davis ISS.  A new line of data spits out every 2.5 seconds, assuming the ISS you are listening to is on Channel 1 (the packet rate slows by 62.5 ms for every Channel ID higher than 1).
-
-    Listening at 915 Mhz...
-    SPI Flash Init OK!
-    0 - Data: 90 D 7D AE 7D 89 38 1C   RSSI: -110dBm   CRC: 4C14
-    1 - Data: E0 F 85 47 3 0 42 D2   RSSI: -72dBm   CRC: 42D2
-    2 - Data: 50 D 85 FF 71 0 C4 98   RSSI: -74dBm   CRC: C498
-    3 - Data: 40 B 85 FF C1 0 D 94   RSSI: -75dBm   CRC: D94
-    4 - Data: 80 C 85 4 49 0 55 E2   RSSI: -80dBm   CRC: 55E2
-    5 - Data: E0 B 85 47 3 0 CB D4   RSSI: -75dBm   CRC: CBD4
-
-The first field is the channel number, the data is the eight data bytes sent by the ISS on every transmission, RSSI is the Received Signal Strength Indication, and the CRC is calculated from the first six bytes in the data packet.  Every packet is sent with a CRC in the seventh and eith bytes, so those two values will agree with the calculated CRC if the packet is good.  All of this is documented [here](https://github.com/dekay/im-me/blob/master/pocketwx/src/protocol.txt).
-
-Note the first packet has a bad CRC as noted above.
-
-[VP2](https://github.com/dekay/DavisRFM69/blob/master/Examples/VP2/VP2.ino) is an emulation of the Davis Vantage Pro2 console that works with Sandaysoft's Cumulus weather software.
+[VP2](https://github.com/dekay/DavisRFM69/blob/master/Examples/VP2/VP2.ino) is an emulation of the Davis Vantage Pro2 console that works with Sandaysoft's Cumulus weather software.  The ISSRx Example hasn't been updated in a while and may be broken.  Just so you know...
 
 ##Blog Writeups
 [ISS Reception](http://madscientistlabs.blogspot.ca/2014/01/more-than-one-way-to-skin-cat.html), along with the best GIF ever.
 
-[Davis Console Emulation](http://madscientistlabs.blogspot.ca/2014/02/build-your-own-davis-weather-station_17.html) combines ISS Reception capabilities along with hookups to sensors for indoor monitoring of temperature, pressure, and humidity.
+[Davis Console Emulation](http://madscientistlabs.blogspot.ca/2014/02/build-your-own-davis-weather-station_17.html) combines ISS Reception capabilities along with hookups to sensors for indoor monitoring of temperature, pressure, and humidity.  
 
 ##Why
 I started playing around with my VP2 Wireless console when I discovered its little expansion port tucked away in the back.  Its purpose is primarily for connection of an exorbitantly priced datalogger that is little more than a one dollar flash chip.  After figuring out how to connect [first a serial interface](http://madscientistlabs.blogspot.ca/2011/01/davis-weatherlink-software-not-required.html) and then [building my own datalogger](http://madscientistlabs.blogspot.ca/2011/10/build-your-own-davis-console-datalogger.html), I figured out the [wireless protocol between the ISS and the console](http://madscientistlabs.blogspot.ca/2012/03/first-you-get-sugar.html) and put together the first standalone receive using an [IM-ME Pretty Pink Pager](http://madscientistlabs.blogspot.ca/2012/04/achievement-unlocked-im-me-weather.html).
