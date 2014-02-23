@@ -146,7 +146,7 @@ void loop() {
     }
 
     if (strmon) printStrm();
-#if 1
+#if 0
     Serial.print(radio.CHANNEL);
     Serial.print(F(" - Data: "));
     for (byte i = 0; i < DAVIS_PACKET_LEN; i++) {
