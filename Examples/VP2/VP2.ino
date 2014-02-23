@@ -87,6 +87,7 @@ void setup() {
   sCmd.addCommand("STRMON", cmdStrmon);     // Enable printing of received packet data
   sCmd.addCommand("TEST", cmdTest);         // Echo's "TEST"
   sCmd.addCommand("VER", cmdVer);           // Send the associated date for this version
+  sCmd.addCommand("WRD\x12M", cmdWRD);      // Support the Davis legacy "WRD" command
   sCmd.setDefaultHandler(cmdUnrecognized);  // Handler for command that isn't matched
   sCmd.setNullHandler(cmdWake);             // Handler for an empty line to wake the simulated console
 }
@@ -414,6 +415,11 @@ void cmdTest() {
 void cmdVer() {
   printOk();
   Serial.print(F("Sep 29 2009\n\r"));
+}
+
+void cmdWRD() {
+  printAck();
+  Serial.write(16);
 }
 
 void cmdWake() {
