@@ -138,17 +138,14 @@ void loop() {
       processPacket();
       packetStats[RECEIVED_STREAK]++;
       hopCount = 1;
-      lastRxTime = millis();
-      radio.hop();
       blink(LED,3);
     } else {
-      radio.hop();
       packetStats[CRC_ERRORS]++;
       packetStats[RECEIVED_STREAK] = 0;
     }
 
     if (strmon) printStrm();
-#if 0
+#if 1
     Serial.print(radio.CHANNEL);
     Serial.print(F(" - Data: "));
     for (byte i = 0; i < DAVIS_PACKET_LEN; i++) {
@@ -158,6 +155,9 @@ void loop() {
     Serial.print(F("  RSSI: "));
     Serial.println(radio.RSSI);
 #endif
+    // Whether CRC is right or not, we count that as reception and hop.
+    lastRxTime = millis();
+    radio.hop();
   }
 
   // If a packet was not received at the expected time, hop the radio anyway

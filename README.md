@@ -34,7 +34,7 @@ fitted with an RFM69W (Semtech SX1231/SX1231) transceiver module.
 
 ##Miscellaneous / Possible Issues
 
-Reception quality has been greatly improved in this release.  There looks to be a bug where the hop-ahead code has broken, but I expect that will be fixed soon.  Please let me know if you find other issues.
+Reception quality has been greatly improved in this release.  ~~There looks to be a bug where the hop-ahead code has broken, but I expect that will be fixed soon~~ I am getting around 99% good packets now.  Please let me know if you find any issues.
 
 ##Sample Usage
 [VP2](https://github.com/dekay/DavisRFM69/blob/master/Examples/VP2/VP2.ino) is an emulation of the Davis Vantage Pro2 console that works with Sandaysoft's Cumulus weather software.  The ISSRx Example hasn't been updated in a while and may be broken.  Just so you know...
