@@ -10,6 +10,9 @@
 // You are free to use/extend this library but please abide with the CC-BY-SA license:
 // http://creativecommons.org/licenses/by-sa/3.0/
 
+#ifndef DAVISRFM69_h
+#define DAVISRFM69_h
+
 // Uncomment ONE AND ONLY ONE of the four #define's below.  This determines the
 // frequency table the code will use.  Note that only the US (actually North
 // America) and EU frequencies are defined at this time.  Australia and New
@@ -20,25 +23,81 @@
 //#define DAVIS_FREQS_AU
 //#define DAVIS_FREQS_NZ
 
-#ifndef DAVISRFM69_h
-#define DAVISRFM69_h
 #include <Davisdef.h>
 #include <Arduino.h>            //assumes Arduino IDE v1.0 or greater
-#include <../RFM69/RFM69.h>
 
-class DavisRFM69: public RFM69 {
+#define DAVIS_PACKET_LEN      8 // ISS has fixed packet lengths of eight bytes, including CRC
+#define SPI_CS               SS // SS is the SPI slave select pin, for instance D10 on atmega328
+#define RF69_IRQ_PIN          2 // INT0 on AVRs should be connected to DIO0 (ex on Atmega328 it's D2)
+#define CSMA_LIMIT          -90 // upper RX signal sensitivity threshold in dBm for carrier sense access
+#define RF69_MODE_SLEEP       0 // XTAL OFF
+#define RF69_MODE_STANDBY     1 // XTAL ON
+#define RF69_MODE_SYNTH       2 // PLL ON
+#define RF69_MODE_RX          3 // RX MODE
+#define RF69_MODE_TX          4 // TX MODE
+
+#define null                  0
+#define COURSE_TEMP_COEF    -90 // puts the temperature reading in the ballpark, user can fine tune the returned value
+
+class DavisRFM69 {
   public:
+    static volatile byte DATA[DAVIS_PACKET_LEN];  // recv/xmit buf, including header, CRC, and RSSI value
+    static volatile byte _mode; //should be protected?
+    static volatile bool _packetReceived;
+    static volatile byte CHANNEL;
+    static volatile int RSSI;
+
+    DavisRFM69(byte slaveSelectPin=SPI_CS, byte interruptPin=RF69_IRQ_PIN, bool isRFM69HW=false) {
+      _slaveSelectPin = slaveSelectPin;
+      _interruptPin = interruptPin;
+      _mode = RF69_MODE_STANDBY;
+      _packetReceived = false;
+      _powerLevel = 31;
+      _isRFM69HW = isRFM69HW;
+    }
+
     void send(byte toAddress, const void* buffer, byte bufferSize, bool requestACK=false);
     static volatile byte hopIndex;
-    bool initialize(byte freqBand, byte ID, byte networkID=1);
     void setChannel(byte channel);
     void hop();
     unsigned int crc16_ccitt(volatile byte *buf, byte len);
 
+    void initialize();
+    bool canSend();
+    void send(const void* buffer, byte bufferSize);
+    bool receiveDone();
+    void setFrequency(uint32_t FRF);
+    void setCS(byte newSPISlaveSelect);
+    int readRSSI(bool forceTrigger=false);
+    void setHighPower(bool onOFF=true); //have to call it after initialize for RFM69HW
+    void setPowerLevel(byte level); //reduce/increase transmit power level
+    void sleep();
+    byte readTemperature(byte calFactor=0); //get CMOS temperature (8bit)
+    void rcCalibration(); //calibrate the internal RC oscillator for use in wide temperature variations - see datasheet section [4.3.5. RC Timer Accuracy]
+
+    // allow hacking registers by making these public
+    byte readReg(byte addr);
+    void writeReg(byte addr, byte val);
+    void readAllRegs();
+
   protected:
     void virtual interruptHandler();
-    void sendFrame(byte toAddress, const void* buffer, byte size, bool requestACK=false, bool sendACK=false);
+    void sendFrame(const void* buffer, byte size);
     byte reverseBits(byte b);
+
+    static void isr0();
+
+    static DavisRFM69* selfPointer;
+    byte _slaveSelectPin;
+    byte _interruptPin;
+    byte _powerLevel;
+    bool _isRFM69HW;
+
+    void receiveBegin();
+    void setMode(byte mode);
+    void setHighPowerRegs(bool onOff);
+    void select();
+    void unselect();
 };
 
 // FRF_MSB, FRF_MID, and FRF_LSB for the 51 North American channels & 5 European channels.

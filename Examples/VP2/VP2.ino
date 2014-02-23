@@ -59,7 +59,7 @@ unsigned int packetStats[PACKET_STATS_LENGTH] = {0, 0, 0, 0 ,0};
 void setup() {
   Serial.begin(SERIAL_BAUD);
   delay(10);
-  radio.initialize(0,0,0);  // 0, 0, 0 is Frequency, nodeID and networkID, always zero in this implementation.
+  radio.initialize();
   radio.setChannel(0);              // Frequency / Channel is *not* set in the initialization. Do it right after.
 #ifdef IS_RFM69HW
   radio.setHighPower(); //uncomment only for RFM69HW!
@@ -113,7 +113,7 @@ void setup() {
 // - Wind speed 10 minute average every minute
 
 long lastPeriod = -1;
-long lastRxTime = 0;
+unsigned long lastRxTime = 0;
 byte hopCount = 0;
 unsigned int packetInterval = 2555;
 
@@ -142,15 +142,16 @@ void loop() {
       radio.hop();
       blink(LED,3);
     } else {
+      radio.hop();
       packetStats[CRC_ERRORS]++;
       packetStats[RECEIVED_STREAK] = 0;
     }
 
     if (strmon) printStrm();
 #if 0
-    Serial.print(radio.hopIndex);
+    Serial.print(radio.CHANNEL);
     Serial.print(F(" - Data: "));
-    for (byte i = 0; i < radio.DATALEN; i++) {
+    for (byte i = 0; i < DAVIS_PACKET_LEN; i++) {
       Serial.print(radio.DATA[i], HEX);
       Serial.print(F(" "));
     }
@@ -446,7 +447,7 @@ void printOk() {
 }
 
 void printStrm() {
-  for (byte i = 0; i < radio.DATALEN; i++) {
+  for (byte i = 0; i < DAVIS_PACKET_LEN; i++) {
     Serial.print(i);
     Serial.print(" = ");
     Serial.print(radio.DATA[i], HEX);
