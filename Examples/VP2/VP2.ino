@@ -332,19 +332,60 @@ void cmdEebrd() {
   cmdNumBytes = sCmd.next();
   if ((cmdMemLocation != NULL) && (cmdNumBytes != NULL)) {
     switch (strtol(cmdMemLocation, NULL, 16)) {
-    case 0x0B:  // Memory location for latitude. Assume two bytes are being asked for.
+    case EEPROM_LATITUDE_LSB:
       response[0] = lowByte(LATITUDE);
       response[1] = highByte(LATITUDE);
       responseLength = 2;
       break;
-    case 0x0D:  // Memory location for longitude. Assume two bytes are being asked for.
+    case EEPROM_LONGITUDE_LSB:
       response[0] = lowByte(LONGITUDE);
       response[1] = highByte(LONGITUDE);
       responseLength = 2;
       break;
-    case 0x2B:  // Memory location for setup bits. Assume one byte is being asked for.
-      // TODO DON'T HARDCODE SETUP BITS
-      response[0] = 0b01000001;
+    case EEPROM_ELEVATION_LSB:
+      response[0] = lowByte(ELEVATION);
+      response[1] = highByte(ELEVATION);
+      responseLength = 2;
+      break;
+    case EEPROM_TIME_ZONE_INDEX:
+      response[0] = GMT_ZONE_MINUS600;
+      responseLength = 1;
+      break;
+    case EEPROM_DST_MANAUTO:
+      response[0] = DST_USE_MODE_MANUAL;
+      responseLength = 1;
+      break;
+    case EEPROM_DST_OFFON:
+      response[0] = DST_SET_MODE_STANDARD;
+      responseLength = 1;
+      break;
+    case EEPROM_GMT_OFFSET_LSB:
+      // TODO GMT_OFFSETS haven't been calculated yet. Zero for now.
+      response[0] = lowByte(GMT_OFFSET_MINUS600);
+      response[1] = highByte(GMT_OFFSET_MINUS600);
+      responseLength = 2;
+      break;
+    case EEPROM_GMT_OR_ZONE:
+      response[0] = GMT_OR_ZONE_USE_INDEX;
+      responseLength = 1;
+      break;
+    case EEPROM_UNIT_BITS:  // Memory location for setup bits. Assume one byte is being asked for.
+      response[0] = BAROMETER_UNITS_IN | TEMP_UNITS_TENTHS_F | ELEVATION_UNITS_FEET | RAIN_UNITS_IN | WIND_UNITS_MPH;
+      responseLength = 1;
+      break;
+    case EEPROM_SETUP_BITS:  // Memory location for setup bits. Assume one byte is being asked for.
+      // TODO The AM / PM indication isn't set yet.  Need my clock chip first.
+      response[0] = LONGITUDE_WEST | LATITUDE_NORTH | RAIN_COLLECTOR_01IN | WIND_CUP_LARGE | MONTH_DAY_MONTHDAY | AMPM_TIME_MODE_24H;
+      responseLength = 1;
+      break;
+    case EEPROM_RAIN_YEAR_START:
+      response[0] = RAIN_SEASON_START_JAN;
+      responseLength = 1;
+      break;
+    case EEPROM_ARCHIVE_PERIOD:
+      // TODO We don't actually implement archiving yet, and when we do, this value needs to sync
+      // with the actual archive period being used.
+      response[0] = ARCHIVE_PERIOD_MINS_10;
       responseLength = 1;
       break;
     default:
