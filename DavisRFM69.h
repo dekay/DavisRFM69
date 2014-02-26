@@ -60,7 +60,7 @@ class DavisRFM69 {
     static volatile byte hopIndex;
     void setChannel(byte channel);
     void hop();
-    unsigned int crc16_ccitt(volatile byte *buf, byte len);
+    unsigned int crc16_ccitt(volatile byte *buf, byte len, unsigned int initCrc = 0);
 
     void initialize();
     bool canSend();
@@ -165,10 +165,10 @@ static const uint8_t __attribute__ ((progmem)) FRF[DAVIS_FREQ_TABLE_LENGTH][3] =
 #define DAVIS_FREQ_TABLE_LENGTH 5
 static const uint8_t __attribute__ ((progmem)) FRF[DAVIS_FREQ_TABLE_LENGTH][3] =
 {
-  {0xD9, 0x4, 0x45},
-  {0xD9, 0x13, 0x4},
+  {0xD9, 0x04, 0x45},
+  {0xD9, 0x13, 0x04},
   {0xD9, 0x21, 0xC2},
-  {0xD9, 0xB, 0xA4},
+  {0xD9, 0x0B, 0xA4},
   {0xD9, 0x1A, 0x63}
 };
 #elif defined (DAVIS_FREQS_AU)
@@ -178,5 +178,91 @@ static const uint8_t __attribute__ ((progmem)) FRF[DAVIS_FREQ_TABLE_LENGTH][3] =
 #else
 #error ** ERROR DAVIS_FREQS MUST BE DEFINED AS ONE OF _US, _EU, _AZ, or NZ **
 #endif  // DAVIS_FREQS
+
+// archive record type for DMP and DMPAFT commands
+struct __attribute__((packed)) ArchiveRec
+{
+  int16_t dateStamp;
+  int16_t timeStamp;
+  int16_t outsideTemp;
+  int16_t highOutTemp;
+  int16_t lowOutTemp;
+  int16_t rainfall;
+  int16_t highRainRate;
+  int16_t barometer;
+  int16_t solarRad;
+  int16_t windSamples;
+  int16_t insideTemp;
+  byte    insideHum;
+  byte    outsideHum;
+  byte    avgWindSpd;
+  byte    highWindSpd;
+  byte    dirHiWindSpd;
+  byte    prevWindDir;
+  byte    avgUVIndex;
+  byte    eT;
+  int16_t highSolarRad;
+  byte    highUVIdx;
+  byte    forecastRule;
+  int16_t leafTemp;
+  int16_t leafWet;
+  byte    soilTemp0;
+  byte    soilTemp1;
+  byte    soilTemp2;
+  byte    soilTemp3;
+  byte    recType;
+  byte    extraHum0;
+  byte    extraHum1;
+  byte    extraTemp0;
+  byte    extraTemp1;
+  byte    extraTemp2;
+  byte    soilMoist0;
+  byte    soilMoist1;
+  byte    soilMoist2;
+  byte    soilMoist3;
+};
+
+// fake archive record (temporary)
+static const ArchiveRec fakeArchiveRec =
+{
+  26 + 2 * 32 + (2014 - 2000) * 512,
+  (19 * 100) + 25,
+  32767,
+  -32768,
+  32767,
+  0,
+  0,
+  0,
+  32767,
+  0,
+  32767,
+  255,
+  255,
+  255,
+  0,
+  32767,
+  32767,
+  255,
+  0,
+  0,
+  0,
+  193,
+  255,
+  255,
+  255,
+  255,
+  255,
+  255,
+  0,
+  255,
+  255,
+  32767,
+  32767,
+  32767,
+  255,
+  255,
+  255,
+  255
+};
 
 #endif  // DAVISRFM_h

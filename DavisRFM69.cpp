@@ -81,7 +81,7 @@ void DavisRFM69::initialize()
   SPI.begin();
 
   do writeReg(REG_SYNCVALUE1, 0xaa); while (readReg(REG_SYNCVALUE1) != 0xaa);
-	do writeReg(REG_SYNCVALUE1, 0x55); while (readReg(REG_SYNCVALUE1) != 0x55);
+        do writeReg(REG_SYNCVALUE1, 0x55); while (readReg(REG_SYNCVALUE1) != 0x55);
 
   for (byte i = 0; CONFIG[i][0] != 255; i++)
     writeReg(CONFIG[i][0], CONFIG[i][1]);
@@ -179,9 +179,9 @@ byte DavisRFM69::reverseBits(byte b)
 }
 
 // Davis CRC calculation from http://www.menie.org/georges/embedded/
-unsigned int DavisRFM69::crc16_ccitt(volatile byte *buf, byte len)
+unsigned int DavisRFM69::crc16_ccitt(volatile byte *buf, byte len, unsigned int initCrc)
 {
-  unsigned int crc = 0;
+  unsigned int crc = initCrc;
   while( len-- ) {
     int i;
     crc ^= *(char *)buf++ << 8;
