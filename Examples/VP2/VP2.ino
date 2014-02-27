@@ -37,6 +37,9 @@
 #define LONGITUDE 541    // Station longitude in tenths of degrees North
 #define ELEVATION 800    // Station height above sea level in feet
 
+#define PACKET_INTERVAL 2555
+#define LOOP_INTERVAL 2500
+
 boolean strmon = false;      // Print the packet when received?
 DavisRFM69 radio;
 SPIFlash flash(8, 0xEF30); //EF40 for 16mbit windbond chip
@@ -119,11 +122,14 @@ void setup() {
 
 long lastPeriod = -1;
 unsigned long lastRxTime = 0;
+unsigned long lastLoopTime = 0;
 byte hopCount = 0;
-unsigned int packetInterval = 2555;
+unsigned int loopCount = 0;
 
 void loop() {
-  sCmd.readSerial();     // Process serial commands
+  if (Serial.available() > 0) loopCount = 0; // if we receive anything while sending LOOP packets, stop the stream
+  sendLoopPacket(); // send out a LOOP packet if needed
+  sCmd.readSerial(); // Process serial commands
 
   int currPeriod = millis()/SENSOR_POLL_INTERVAL;
 
@@ -169,7 +175,7 @@ void loop() {
   // in an attempt to keep up.  Give up after 25 failed attempts.  Keep track
   // of packet stats as we go.  I consider a consecutive string of missed
   // packets to be a single resync.  Thx to Kobuki for this algorithm.
-  if ((hopCount > 0) && ((millis() - lastRxTime) > (hopCount * packetInterval + 200))) {
+  if ((hopCount > 0) && ((millis() - lastRxTime) > (hopCount * PACKET_INTERVAL + 200))) {
     packetStats[PACKETS_MISSED]++;
     if (hopCount == 1) packetStats[NUM_RESYNCS]++;
     if (++hopCount > 25) hopCount = 0;
@@ -418,7 +424,21 @@ void cmdHiLows() {
 }
 
 void cmdLoop() {
+  char *loops;
+  lastLoopTime = 0;
   printAck();
+  loops = sCmd.next();
+  if (loops != NULL) {
+    loopCount = strtol(loops, NULL, 10);
+  } else {
+    loopCount = 1;
+  }
+}
+  
+void sendLoopPacket() {
+  if (loopCount <= 0 || millis() - lastLoopTime < LOOP_INTERVAL) return;
+  lastLoopTime = millis();
+  loopCount--;
   // Calculate the CRC over the entire length of the current packet with the exception of the
   // last two bytes in the packet that hold the CRC itself.
   unsigned int crc = radio.crc16_ccitt(loopData, LOOP_PACKET_LENGTH - 2);
@@ -477,7 +497,7 @@ void cmdGettime() {
 
 void cmdSettime() {
   printAck();
-  delay(1000);
+  delay(2000);
   for (byte i = 0; i < 6; i++) {
     dateTime[i] = Serial.read();
     delay(200);
@@ -504,7 +524,8 @@ void cmdDmpaft() {
     Serial.write(response[i]);
   Serial.write(highByte(crc));
   Serial.write(lowByte(crc));
-  if (Serial.read() != 0x06); // return; // client is not interested in our data (or an error happened we don't care about)
+  while (Serial.available() <= 0);
+  if (Serial.read() != 0x06); // should return if condition is true, but can't get a 0x06 here for the life of me, even if weewx does send it...
 
   // The format of each page is:
   // 1 Byte sequence number (starts at 0 and wraps from 255 back to 0)
