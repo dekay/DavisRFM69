@@ -54,6 +54,7 @@ byte loopData[LOOP_PACKET_LENGTH] = {
   '\r', 0, 0                                             // Loop packet bytes 96 - 98
 };
 
+byte dateTime[6] = { 42, 17, 5, 24, 2, 114 };
 unsigned int packetStats[PACKET_STATS_LENGTH] = {0, 0, 0, 0 ,0};
 
 void setup() {
@@ -88,6 +89,9 @@ void setup() {
   sCmd.addCommand("TEST", cmdTest);         // Echo's "TEST"
   sCmd.addCommand("VER", cmdVer);           // Send the associated date for this version
   sCmd.addCommand("WRD\x12M", cmdWRD);      // Support the Davis legacy "WRD" command
+  sCmd.addCommand("GETTIME", cmdGettime);   // Send back current RTC date/time
+  sCmd.addCommand("SETTIME", cmdSettime);   // Update current RTC date/time from PC
+  sCmd.addCommand("DMPAFT", cmdDmpaft);     // Download archive records after date:time specified
   sCmd.setDefaultHandler(cmdUnrecognized);  // Handler for command that isn't matched
   sCmd.setNullHandler(cmdWake);             // Handler for an empty line to wake the simulated console
 }
@@ -461,6 +465,64 @@ void cmdVer() {
 void cmdWRD() {
   printAck();
   Serial.write(16);
+}
+
+void cmdGettime() {
+  printAck();
+  unsigned int crc = radio.crc16_ccitt(dateTime, 6);
+  Serial.write(dateTime, 6);
+  Serial.write(highByte(crc));
+  Serial.write(lowByte(crc));
+}
+
+void cmdSettime() {
+  printAck();
+  delay(1000);
+  for (byte i = 0; i < 6; i++) {
+    dateTime[i] = Serial.read();
+    delay(200);
+  }
+  for (byte i = 0; i < 2; i++); // read CRC
+  printAck();
+}
+
+void cmdDmpaft() {
+  printAck();
+  // read 2 byte vantageDateStamp, the 2 byte vantageTimeStamp, and a 2 byte CRC
+  while (Serial.available() <= 0);
+  for (byte i = 0; i < 6; i++) Serial.read();
+  printAck();
+
+  // From Davis' docs:
+  //   Each archive record is 52 bytes. Records are sent to the PC in 264 byte pages. Each page
+  //   contains 5 archive records and 4 unused bytes.
+
+  // send the number of "pages" that will be sent (2 bytes), the location within the first page of the first record, and 2 Byte CRC
+  byte response[4] = { 1, 0, 0, 0 }; // L,H;L,H -- 1 page; first record is #0
+  unsigned int crc = radio.crc16_ccitt(response, 4);
+  for (byte i = 0; i < 4; i++)
+    Serial.write(response[i]);
+  Serial.write(highByte(crc));
+  Serial.write(lowByte(crc));
+  if (Serial.read() != 0x06); // return; // client is not interested in our data (or an error happened we don't care about)
+
+  // The format of each page is:
+  // 1 Byte sequence number (starts at 0 and wraps from 255 back to 0)
+  // 52 Byte Data record [5 times]
+  // 4 Byte unused bytes
+  // 2 Byte CRC
+  response[0] = 0;
+  crc = radio.crc16_ccitt(response, 1);
+  Serial.write(0);
+  byte * farp = (byte *)&fakeArchiveRec;
+  for (byte i = 0; i < 5; i++) {
+    crc = radio.crc16_ccitt(farp, sizeof(fakeArchiveRec), crc);
+    for (byte j = 0; j < sizeof(fakeArchiveRec); j++) Serial.write(farp[j]);
+  }
+  for (byte i = 0; i < 4; i++) Serial.write(0);
+  crc = radio.crc16_ccitt(response, 4, crc);
+  Serial.write(highByte(crc));
+  Serial.write(lowByte(crc));
 }
 
 void cmdWake() {
