@@ -15,7 +15,6 @@
 // transceiver module.  Note that RFM12B-based modules will not work.  See the README
 // for more details.
 
-#include <RFM69.h>
 #include <DavisRFM69.h>
 #include <DHTxx.h>
 #include <SPI.h>
@@ -23,6 +22,7 @@
 #include <Wire.h>
 #include <Adafruit_BMP085.h>
 #include <SerialCommand.h>
+#include <RTC_DS3231.h>       // From https://github.com/mizraith/RTClib
 
 // NOTE: *** One of DAVIS_FREQS_US, DAVIS_FREQS_EU, DAVIS_FREQS_AU, or
 // DAVIS_FREQS_NZ MUST be defined at the top of DavisRFM69.h ***
@@ -39,12 +39,14 @@
 
 #define PACKET_INTERVAL 2555
 #define LOOP_INTERVAL 2500
+#define POT_GAP_DEGREES 5     // Dead zone on the wind vane as +/- degrees from North
 
-boolean strmon = false;      // Print the packet when received?
+boolean strmon = false;       // Print the packet when received?
 DavisRFM69 radio;
 SPIFlash flash(8, 0xEF30); //EF40 for 16mbit windbond chip
 Adafruit_BMP085 bmp;
 DHTxx tempHum(DHT_DATA_PIN);
+RTC_DS3231 RTC;
 SerialCommand sCmd;
 
 byte loopData[LOOP_PACKET_LENGTH] = {
@@ -57,7 +59,6 @@ byte loopData[LOOP_PACKET_LENGTH] = {
   '\r', 0, 0                                             // Loop packet bytes 96 - 98
 };
 
-byte dateTime[6] = { 42, 17, 5, 24, 2, 114 };
 unsigned int packetStats[PACKET_STATS_LENGTH] = {0, 0, 0, 0 ,0};
 
 void setup() {
@@ -68,14 +69,19 @@ void setup() {
 #ifdef IS_RFM69HW
   radio.setHighPower(); //uncomment only for RFM69HW!
 #endif
-#if 0
-  if (flash.initialize())
-    Serial.println(F("SPI Flash Init OK!"));
-  else
-    Serial.println(F("SPI Flash Init FAIL! (is chip present?)"));
-#endif
+
+  // Set up BMP085 pressure and temperature sensor
   if (!bmp.begin()) {
     Serial.println(F("Could not find a valid BMP085 sensor, check wiring!"));
+    while (1) { }
+  }
+
+  // Set up DS3231 real time clock
+  Wire.begin();
+  RTC.begin();
+
+  if (! RTC.isrunning()) {
+    Serial.println(F("Could not find a valid DS3231 RTC, check wiring and ensure battery is installed!"));
     while (1) { }
   }
 
@@ -194,19 +200,20 @@ void processPacket() {
   Serial.println(radio.DATA[1]);
 #endif
 
-  // TODO This should be right but it isn't.  It doesn't quite agree with the console.
-  unsigned int windDirection = radio.DATA[2] * 360.0 / 255.0 - 7;
+  // There is a dead zone on the wind vane. This formula is still a work in progress.
+  // When this code says 191, my console says 192.  We aren't far off.
+  unsigned int windDirection = POT_GAP_DEGREES - 1 + radio.DATA[2] * ((float)(361 - 2 * POT_GAP_DEGREES) / 255.0f);
   loopData[WIND_DIRECTION_LSB] = lowByte(windDirection);
   loopData[WIND_DIRECTION_MSB] = highByte(windDirection);
 
 #if 0
-  Serial.print("Wind Direction: ");
+  Serial.print(F("Wind Direction: "));
   Serial.print(windDirection);
-  Serial.print("  MSB: ");
+  Serial.print(F("  MSB: "));
   Serial.print(loopData[WIND_DIRECTION_MSB]);
-  Serial.print("  LSB: ");
+  Serial.print(F("  LSB: "));
   Serial.print(loopData[WIND_DIRECTION_LSB]);
-  Serial.print("  Rx Byte 2: ");
+  Serial.print(F("  Rx Byte 2: "));
   Serial.println(radio.DATA[2]);
 #endif
 
@@ -434,7 +441,7 @@ void cmdLoop() {
     loopCount = 1;
   }
 }
-  
+
 void sendLoopPacket() {
   if (loopCount <= 0 || millis() - lastLoopTime < LOOP_INTERVAL) return;
   lastLoopTime = millis();
@@ -487,23 +494,56 @@ void cmdWRD() {
   Serial.write(16);
 }
 
+// Gettime and Settime use a binary format as follows:
+// seconds - minutes - hours24 - day - month - (year-1900)
+// Example (to set 3:27:00 pm, June 4, 2003):
+// >"SETTIME"<LF>
+// <<ACK>
+// ><0><27><15><4><6><103><2 Bytes<<ACK><2 bytes of CRC>
+// <<ACK>
 void cmdGettime() {
+  byte davisDateTime[6];
   printAck();
-  unsigned int crc = radio.crc16_ccitt(dateTime, 6);
-  Serial.write(dateTime, 6);
+  DateTime now = RTC.now();
+  davisDateTime[0] = now.second();
+  davisDateTime[1] = now.minute();
+  davisDateTime[2] = now.hour();
+  davisDateTime[3] = now.day();
+  davisDateTime[4] = now.month();
+  davisDateTime[5] = now.year() - 1900;
+#if 0
+  Serial.print(F("The time in reverse Davis format is now"));
+  for (int8_t i = 5; i >= 0; i--) {
+    Serial.print(F(" "));
+    Serial.print(davisDateTime[i]);
+  }
+  Serial.println();
+#endif
+  unsigned int crc = radio.crc16_ccitt(davisDateTime, 6);
+  Serial.write(davisDateTime, 6);
   Serial.write(highByte(crc));
   Serial.write(lowByte(crc));
 }
 
 void cmdSettime() {
+  byte davisDateTime[8];
   printAck();
-  delay(2000);
-  for (byte i = 0; i < 6; i++) {
-    dateTime[i] = Serial.read();
-    delay(200);
+  // delay(2000);    Why were these delays here if read() is blocking? Kobuki code bug?
+  // Read six bytes for time and another two bytes for CRC
+  for (byte i = 0; i < 8; i++) {
+    davisDateTime[i] = Serial.read();
+    // delay(200);
   }
-  for (byte i = 0; i < 2; i++); // read CRC
-  printAck();
+
+  // Set the time only if the CRC is OK
+  unsigned int crc = radio.crc16_ccitt(davisDateTime, 6);
+  if (crc == (word(davisDateTime[6], davisDateTime[7]))) {
+    printAck();
+    RTC.adjust(DateTime(davisDateTime[5] + 1900, davisDateTime[4], davisDateTime[3], \
+      davisDateTime[2], davisDateTime[1], davisDateTime[0]));
+  } else {
+    printNack();
+  }
 }
 
 void cmdDmpaft() {

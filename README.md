@@ -30,19 +30,21 @@ This library has been developed on a Moteino R3 [(see here for the new R4 versio
 fitted with an RFM69W (Semtech SX1231/SX1231) transceiver module.
 
 ##Installation
-[See this blog post](http://madscientistlabs.blogspot.ca/2014/02/build-your-own-davis-weather-station_17.html) where I combines ISS Reception capabilities along with hookups to sensors for indoor monitoring of temperature, pressure, and humidity.  Note that this code no longer requires the installation of [LowPowerLab's RFM69 library](https://github.com/LowPowerLab/RFM69) discussed in that post, but you will still need to install his [SPIFlash library](https://github.com/LowPowerLab/SPIFlash).
+[See this blog post](http://madscientistlabs.blogspot.ca/2014/02/build-your-own-davis-weather-station_17.html) where I combines ISS Reception capabilities along with hookups to sensors for indoor monitoring of temperature, pressure, and humidity.  Note that this code no longer requires the installation of [LowPowerLab's RFM69 library](https://github.com/LowPowerLab/RFM69) discussed in that post, but you will still need to install his [SPIFlash library](https://github.com/LowPowerLab/SPIFlash).  Since that post was written, I have also added support for the DS3231 Real Time Clock chip.  To get this to work from a software perspective, you will need [this RTC library](https://github.com/mizraith/RTClib) in your Arduino "libraries" folder.
 
 ##Miscellaneous / Possible Issues
 
 Reception quality has been greatly improved in this release.  ~~There looks to be a bug where the hop-ahead code has broken, but I expect that will be fixed soon~~ I am getting around 99% good packets now.  Please let me know if you find any issues.
 
 ##Sample Usage
-[VP2](https://github.com/dekay/DavisRFM69/blob/master/Examples/VP2/VP2.ino) is an emulation of the Davis Vantage Pro2 console that works with Sandaysoft's Cumulus weather software.  The ISSRx Example hasn't been updated in a while and may be broken.  Just so you know...
+[VP2](https://github.com/dekay/DavisRFM69/blob/master/Examples/VP2/VP2.ino) is an emulation of the Davis Vantage Pro2 console that works with Sandaysoft's Cumulus weather software.  As noted above, you will need [this RTC library](https://github.com/mizraith/RTClib) in your Arduino "libraries" folder.
+
+The ISSRx Example hasn't been updated in a while and may be broken.  Just so you know...
 
 ##Blog Writeups
 [ISS Reception](http://madscientistlabs.blogspot.ca/2014/01/more-than-one-way-to-skin-cat.html), along with the best GIF ever.
 
-[Davis Console Emulation](http://madscientistlabs.blogspot.ca/2014/02/build-your-own-davis-weather-station_17.html) combines ISS Reception capabilities along with hookups to sensors for indoor monitoring of temperature, pressure, and humidity.  
+[Davis Console Emulation](http://madscientistlabs.blogspot.ca/2014/02/build-your-own-davis-weather-station_17.html) combines ISS Reception capabilities along with hookups to sensors for indoor monitoring of temperature, pressure, and humidity.
 
 ##Why
 I started playing around with my VP2 Wireless console when I discovered its little expansion port tucked away in the back.  Its purpose is primarily for connection of an exorbitantly priced datalogger that is little more than a one dollar flash chip.  After figuring out how to connect [first a serial interface](http://madscientistlabs.blogspot.ca/2011/01/davis-weatherlink-software-not-required.html) and then [building my own datalogger](http://madscientistlabs.blogspot.ca/2011/10/build-your-own-davis-console-datalogger.html), I figured out the [wireless protocol between the ISS and the console](http://madscientistlabs.blogspot.ca/2012/03/first-you-get-sugar.html) and put together the first standalone receive using an [IM-ME Pretty Pink Pager](http://madscientistlabs.blogspot.ca/2012/04/achievement-unlocked-im-me-weather.html).
