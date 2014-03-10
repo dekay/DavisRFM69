@@ -61,6 +61,12 @@ byte loopData[LOOP_PACKET_LENGTH] = {
 
 unsigned int packetStats[PACKET_STATS_LENGTH] = {0, 0, 0, 0 ,0};
 
+volatile bool oneMinutePassed = false;
+
+void rtcInterrupt(void) {
+  oneMinutePassed = true;
+}
+
 void setup() {
   Serial.begin(SERIAL_BAUD);
   delay(10);
@@ -76,7 +82,7 @@ void setup() {
     while (1) { }
   }
 
-  // Set up DS3231 real time clock
+  // Set up DS3231 real time clock on Moteino INT1
   Wire.begin();
   RTC.begin();
 
@@ -84,6 +90,11 @@ void setup() {
     Serial.println(F("Could not find a valid DS3231 RTC, check wiring and ensure battery is installed!"));
     while (1) { }
   }
+
+  RTC.enable32kHz(false);   // We don't even connect this pin
+  RTC.SQWEnable(false);     // Disabling the square wave enables the alarm interrupt
+  setAlarming();
+  attachInterrupt(1, rtcInterrupt, FALLING);
 
   // Setup callbacks for SerialCommand commands
   sCmd.addCommand("BARDATA", cmdBardata);   // Barometer calibration data
@@ -135,6 +146,9 @@ unsigned int loopCount = 0;
 void loop() {
   if (Serial.available() > 0) loopCount = 0; // if we receive anything while sending LOOP packets, stop the stream
   sendLoopPacket(); // send out a LOOP packet if needed
+
+  if (oneMinutePassed) clearAlarmInterrupt();
+
   sCmd.readSerial(); // Process serial commands
 
   int currPeriod = millis()/SENSOR_POLL_INTERVAL;
@@ -633,4 +647,50 @@ void blink(byte PIN, int DELAY_MS)
   digitalWrite(PIN,HIGH);
   delay(DELAY_MS);
   digitalWrite(PIN,LOW);
+}
+
+// Super ugly. Wanted to get this working but running out of time.  Make pretty later.
+// This enables an interrupt every minute.  We will use this for reading sensors on the
+// minute and enabling the archiving on multiples of a minute.
+void setAlarming()
+{
+  Wire.beginTransmission(DS3231_ADDRESS);
+  Wire.write(static_cast<uint8_t>(DS3231_REG_CONTROL));
+  Wire.endTransmission();
+
+  // control register
+  Wire.requestFrom(DS3231_ADDRESS, 1);
+  uint8_t creg = Wire.read();     //do we need the bcd2bin
+
+  creg &= ~0b00000001; // Clear INTCN and A1IE to enable alarm interrupt but disable Alarm1
+  creg |=  0b00000110; // Set A2IE to enable Alarm2
+
+  Wire.beginTransmission(DS3231_ADDRESS);
+  Wire.write(static_cast<uint8_t>(DS3231_REG_CONTROL));
+  Wire.write(static_cast<uint8_t>(creg));
+  Wire.endTransmission();
+
+  Wire.beginTransmission(DS3231_ADDRESS);
+  Wire.write(static_cast<uint8_t>(DS3231_REG_A2DAYDATE));
+  Wire.write(static_cast<uint8_t>(0b10000000));
+  Wire.endTransmission();
+
+  Wire.beginTransmission(DS3231_ADDRESS);
+  Wire.write(static_cast<uint8_t>(DS3231_REG_A2HOURS));
+  Wire.write(static_cast<uint8_t>(0b10000000));
+  Wire.endTransmission();
+
+  Wire.beginTransmission(DS3231_ADDRESS);
+  Wire.write(static_cast<uint8_t>(DS3231_REG_A2MINUTES));
+  Wire.write(static_cast<uint8_t>(0b10000000));
+  Wire.endTransmission();
+}
+
+void clearAlarmInterrupt()
+{
+  oneMinutePassed = false;
+  Wire.beginTransmission(DS3231_ADDRESS);
+  Wire.write(static_cast<uint8_t>(DS3231_REG_STATUS_CTL));
+  Wire.write(static_cast<uint8_t>(0b00000000));
+  Wire.endTransmission();
 }
