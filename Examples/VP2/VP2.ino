@@ -39,7 +39,6 @@
 
 #define PACKET_INTERVAL 2555
 #define LOOP_INTERVAL 2500
-#define POT_GAP_DEGREES 5     // Dead zone on the wind vane as +/- degrees from North
 
 boolean strmon = false;       // Print the packet when received?
 DavisRFM69 radio;
@@ -214,9 +213,12 @@ void processPacket() {
   Serial.println(radio.DATA[1]);
 #endif
 
-  // There is a dead zone on the wind vane. This formula is still a work in progress.
-  // When this code says 191, my console says 192.  We aren't far off.
-  unsigned int windDirection = POT_GAP_DEGREES - 1 + radio.DATA[2] * ((float)(361 - 2 * POT_GAP_DEGREES) / 255.0f);
+  // There is a dead zone on the wind vane. No values are reported between 8
+  // and 352 degrees inclusive. These values correspond to received byte
+  // values of 1 and 255 respectively.  Assuming a straight line fit, we can
+  // solve the equation for two unknowns giving the equation below.
+  // See http://www.wxforum.net/index.php?topic=21967.50
+  unsigned int windDirection = radio.DATA[2] * 1.346456693 + 7.653543307;
   loopData[WIND_DIRECTION_LSB] = lowByte(windDirection);
   loopData[WIND_DIRECTION_MSB] = highByte(windDirection);
 
