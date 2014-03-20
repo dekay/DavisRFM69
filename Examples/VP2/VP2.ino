@@ -215,10 +215,9 @@ void processPacket() {
 
   // There is a dead zone on the wind vane. No values are reported between 8
   // and 352 degrees inclusive. These values correspond to received byte
-  // values of 1 and 255 respectively.  Assuming a straight line fit, we can
-  // solve the equation for two unknowns giving the equation below.
+  // values of 1 and 255 respectively
   // See http://www.wxforum.net/index.php?topic=21967.50
-  unsigned int windDirection = radio.DATA[2] * 1.346456693 + 7.653543307;
+  unsigned int windDirection = 9 + radio.DATA[2] * 342.0f / 255.0f;
   loopData[WIND_DIRECTION_LSB] = lowByte(windDirection);
   loopData[WIND_DIRECTION_MSB] = highByte(windDirection);
 

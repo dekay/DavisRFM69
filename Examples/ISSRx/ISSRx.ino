@@ -1,7 +1,7 @@
 // Sample usage of the DavisRFM69 library to sniff the packets from a Davis Instruments
 // wireless Integrated Sensor Suite (ISS), demostrating compatibility between the RFM69
 // and the TI CC1020 transmitter used in that hardware.  Packets received from the ISS are
-// passes through to the serial port.  This code retains some of the debugging 
+// passes through to the serial port.  This code retains some of the debugging
 // functionality of the LowPowerLabs Gateway sketch, on which this code is based.
 //
 // This is part of the DavisRFM69 library from https://github.com/dekay/DavisRFM69
@@ -9,43 +9,45 @@
 // Example released under the MIT License (http://opensource.org/licenses/mit-license.php)
 // Get the RFM69 and SPIFlash library at: https://github.com/LowPowerLab/
 //
-// This program has been developed on a Moteino R3 Arduino clone with integrated RFM69W 
+// This program has been developed on a Moteino R3 Arduino clone with integrated RFM69W
 // transceiver module.  Note that RFM12B-based modules will not work.  See the README
 // for more details.
 
-#include <RFM69.h>
 #include <DavisRFM69.h>
 #include <SPI.h>
 #include <SPIFlash.h>
 
-// Match frequency to the hardware version of the radio on your Moteino (uncomment one):
-// Note: Only the 915 MHz North American version is supported at this moment.
-//#define FREQUENCY     RF69_433MHZ
-//#define FREQUENCY     RF69_868MHZ
-#define FREQUENCY     RF69_915MHZ
+// NOTE: *** One of DAVIS_FREQS_US, DAVIS_FREQS_EU, DAVIS_FREQS_AU, or
+// DAVIS_FREQS_NZ MUST be defined at the top of DavisRFM69.h ***
+
 //#define IS_RFM69HW    //uncomment only for RFM69HW! Leave out if you have RFM69W!
 #define LED           9  // Moteinos have LEDs on D9
-#define SERIAL_BAUD   115200
+#define SERIAL_BAUD   19200
+#define PACKET_INTERVAL 2555
+boolean strmon = false;       // Print the packet when received?
 
 DavisRFM69 radio;
 SPIFlash flash(8, 0xEF30); //EF40 for 16mbit windbond chip
 
+unsigned int packetStats[PACKET_STATS_LENGTH] = {0, 0, 0, 0 ,0};
+
 void setup() {
   Serial.begin(SERIAL_BAUD);
   delay(10);
-  radio.initialize(FREQUENCY,0,0);  // 0, 0 is nodeID and networkID, always zero in this implementation.
-  radio.setChannel(0);              // Channel is *not* set in the initialization. Do it right after.
+  radio.initialize();
+  radio.setChannel(0);              // Frequency / Channel is *not* set in the initialization. Do it right after.
 #ifdef IS_RFM69HW
   radio.setHighPower(); //uncomment only for RFM69HW!
 #endif
-  char buff[50];
-  sprintf(buff, "\nListening at %d Mhz...", FREQUENCY==RF69_433MHZ ? 433 : FREQUENCY==RF69_868MHZ ? 868 : 915);
-  Serial.println(buff);
+  Serial.println(F("Waiting for signal in region defined in DavisRFM69.h"));
   if (flash.initialize())
     Serial.println("SPI Flash Init OK!");
   else
     Serial.println("SPI Flash Init FAIL! (is chip present?)");
 }
+
+unsigned long lastRxTime = 0;
+byte hopCount = 0;
 
 void loop() {
   //process any serial input
@@ -56,7 +58,7 @@ void loop() {
     {
       radio.readAllRegs();
       Serial.println();
-    }    
+    }
     if (input == 'd') //d=dump flash area
     {
       Serial.println("Flash content:");
@@ -94,26 +96,60 @@ void loop() {
     }
   }
 
-  if (radio.receiveDone())
-  {
-    Serial.print(radio.hopIndex); Serial.print(" - ");
-    Serial.print("Data: ");
-    for (byte i = 0; i < radio.DATALEN; i++) {
-      radio.DATA[i] = radio.DATA[i];
-      Serial.print(radio.DATA[i], HEX);
-      Serial.print(" ");
-    }
-    Serial.print("  RSSI: ");Serial.print(radio.RSSI);Serial.print("dBm   CRC: ");
+  // The check for a zero CRC value indicates a bigger problem that will need
+  // fixing, but it needs to stay until the fix is in.
+  // TODO Reset the packet statistics at midnight once I get my clock module.
+  if (radio.receiveDone()) {
+    packetStats[PACKETS_RECEIVED]++;
     unsigned int crc = radio.crc16_ccitt(radio.DATA, 6);
-    Serial.print(crc, HEX);
-    Serial.println();
-    radio.hop();
+    if ((crc == (word(radio.DATA[6], radio.DATA[7]))) && (crc != 0)) {
+      packetStats[RECEIVED_STREAK]++;
+      hopCount = 1;
+      blink(LED,3);
+    } else {
+      packetStats[CRC_ERRORS]++;
+      packetStats[RECEIVED_STREAK] = 0;
+    }
 
-    Blink(LED,3);
+    if (strmon) printStrm();
+#if 1
+    Serial.print(radio.CHANNEL);
+    Serial.print(F(" - Data: "));
+    for (byte i = 0; i < DAVIS_PACKET_LEN; i++) {
+      Serial.print(radio.DATA[i], HEX);
+      Serial.print(F(" "));
+  }
+  Serial.print(F("  RSSI: "));
+  Serial.println(radio.RSSI);
+#endif
+  // Whether CRC is right or not, we count that as reception and hop.
+  lastRxTime = millis();
+  radio.hop();
+  }
+
+  // If a packet was not received at the expected time, hop the radio anyway
+  // in an attempt to keep up.  Give up after 25 failed attempts.  Keep track
+  // of packet stats as we go.  I consider a consecutive string of missed
+  // packets to be a single resync.  Thx to Kobuki for this algorithm.
+  if ((hopCount > 0) && ((millis() - lastRxTime) > (hopCount * PACKET_INTERVAL + 200))) {
+    packetStats[PACKETS_MISSED]++;
+    if (hopCount == 1) packetStats[NUM_RESYNCS]++;
+    if (++hopCount > 25) hopCount = 0;
+    radio.hop();
   }
 }
 
-void Blink(byte PIN, int DELAY_MS)
+void printStrm() {
+  for (byte i = 0; i < DAVIS_PACKET_LEN; i++) {
+    Serial.print(i);
+    Serial.print(" = ");
+    Serial.print(radio.DATA[i], HEX);
+    Serial.print(F("\n\r"));
+  }
+  Serial.print(F("\n\r"));
+}
+
+void blink(byte PIN, int DELAY_MS)
 {
   pinMode(PIN, OUTPUT);
   digitalWrite(PIN,HIGH);
