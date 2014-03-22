@@ -192,7 +192,7 @@ struct __attribute__((packed)) PacketStats
 
 static PacketStats packetStats = {0, 0, 0, 0 ,0};
 
-#define LOOP_PACKET_LENGTH 99
+#define LOOP_PACKET_LENGTH 97
 
 // LOOP data packet length and structure.
 // See http://www.davisnet.com/support/weather/download/VantageSerialProtocolDocs_v230.pdf
@@ -292,16 +292,16 @@ static const LoopPacket loopInit =
 // archive record type for DMP and DMPAFT commands
 struct __attribute__((packed)) ArchiveRec
 {
-  int16_t dateStamp;
-  int16_t timeStamp;
+  uint16_t dateStamp;
+  uint16_t timeStamp;
   int16_t outsideTemp;
   int16_t highOutTemp;
   int16_t lowOutTemp;
-  int16_t rainfall;
-  int16_t highRainRate;
-  int16_t barometer;
-  int16_t solarRad;
-  int16_t windSamples;
+  uint16_t rainfall;
+  uint16_t highRainRate;
+  uint16_t barometer;
+  uint16_t solarRad;
+  uint16_t windSamples;
   int16_t insideTemp;
   byte    insideHum;
   byte    outsideHum;
@@ -314,8 +314,10 @@ struct __attribute__((packed)) ArchiveRec
   int16_t highSolarRad;
   byte    highUVIdx;
   byte    forecastRule;
-  int16_t leafTemp;
-  int16_t leafWet;
+  byte    leafTemp0;
+  byte    leafTemp1;
+  byte    leafWet0;
+  byte    leafWet1;
   byte    soilTemp0;
   byte    soilTemp1;
   byte    soilTemp2;
@@ -350,8 +352,8 @@ static const ArchiveRec fakeArchiveRec =
   255,
   255,
   0,
-  32767,
-  32767,
+  255,
+  255,
   255,
   0,
   0,
@@ -363,12 +365,14 @@ static const ArchiveRec fakeArchiveRec =
   255,
   255,
   255,
+  255,
+  255,
   0,
   255,
   255,
-  32767,
-  32767,
-  32767,
+  255,
+  255,
+  255,
   255,
   255,
   255,

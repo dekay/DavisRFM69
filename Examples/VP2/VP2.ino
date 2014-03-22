@@ -48,18 +48,7 @@ DHTxx tempHum(DHT_DATA_PIN);
 RTC_DS3231 RTC;
 SerialCommand sCmd;
 
-LoopData testloop;
-
-byte loopData[LOOP_PACKET_LENGTH] = {
-  'L', 'O', 'O', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Loop packet bytes  0 - 15
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,        // Loop packet bytes 16 - 31
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,        // Loop packet bytes 32 - 48
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,        // Loop packet bytes 48 - 63
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,        // Loop packet bytes 64 - 79
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '\n',     // Loop packet bytes 80 - 95
-  '\r', 0, 0                                             // Loop packet bytes 96 - 98
-};
-
+LoopPacket loopData;
 volatile bool oneMinutePassed = false;
 
 void rtcInterrupt(void) {
@@ -74,7 +63,8 @@ void setup() {
 #ifdef IS_RFM69HW
   radio.setHighPower(); //uncomment only for RFM69HW!
 #endif
-Serial.println(sizeof(testloop));
+  // Initialize the loop data array
+  memcpy(&loopData, &loopInit, sizeof(loopInit));
   // Set up BMP085 pressure and temperature sensor
   if (!bmp.begin()) {
     Serial.println(F("Could not find a valid BMP085 sensor, check wiring!"));
@@ -205,10 +195,10 @@ void loop() {
 // Read the data from the ISS and figure out what to do with it
 void processPacket() {
   // Every packet has wind speed, direction, and battery status in it
-  loopData[WIND_SPEED] = radio.DATA[1];
+  loopData.windSpeed = radio.DATA[1];
 #if 0
   Serial.print("Wind Speed: ");
-  Serial.print(loopData[WIND_SPEED);
+  Serial.print(loopData.windSpeed);
   Serial.print("  Rx Byte 1: ");
   Serial.println(radio.DATA[1]);
 #endif
@@ -217,43 +207,30 @@ void processPacket() {
   // and 352 degrees inclusive. These values correspond to received byte
   // values of 1 and 255 respectively
   // See http://www.wxforum.net/index.php?topic=21967.50
-  unsigned int windDirection = 9 + radio.DATA[2] * 342.0f / 255.0f;
-  loopData[WIND_DIRECTION_LSB] = lowByte(windDirection);
-  loopData[WIND_DIRECTION_MSB] = highByte(windDirection);
+  loopData.windDirection = 9 + radio.DATA[2] * 342.0f / 255.0f;
 
 #if 0
   Serial.print(F("Wind Direction: "));
-  Serial.print(windDirection);
-  Serial.print(F("  MSB: "));
-  Serial.print(loopData[WIND_DIRECTION_MSB]);
-  Serial.print(F("  LSB: "));
-  Serial.print(loopData[WIND_DIRECTION_LSB]);
+  Serial.print(loopData.windDirection);
   Serial.print(F("  Rx Byte 2: "));
   Serial.println(radio.DATA[2]);
 #endif
 
-  loopData[TRANSMITTER_BATTERY_STATUS] = (radio.DATA[0] & 0x8) >> 3;
+  loopData.transmitterBatteryStatus = (radio.DATA[0] & 0x8) >> 3;
 #if 0
   Serial.print("Battery status: ");
-  Serial.println(loopData[TRANSMITTER_BATTERY_STATUS]);
+  Serial.println(loopData.transmitterBatteryStatus);
 #endif
 
   // Now look at each individual packet. Mask off the four low order bits. The highest order bit of the
   // four is set high when the ISS battery is low.  The low order three bits are the station ID.
-  int outsideTemp;
 
   switch (radio.DATA[0] & 0xf0) {
   case 0x80:
-    outsideTemp = (int)(word(radio.DATA[3], radio.DATA[4])) >> 4;
-    loopData[OUTSIDE_TEMPERATURE_LSB] = lowByte(outsideTemp);
-    loopData[OUTSIDE_TEMPERATURE_MSB] = highByte(outsideTemp);
+    loopData.outsideTemperature = (int16_t)(word(radio.DATA[3], radio.DATA[4])) >> 4;
 #if 0
     Serial.print(F("Outside Temp: "));
-    Serial.print(outsideTemp);
-    Serial.print(F("  MSB: "));
-    Serial.print(loopData[OUTSIDE_TEMPERATURE_MSB]);
-    Serial.print(F("  LSB: "));
-    Serial.print(loopData[OUTSIDE_TEMPERATURE_LSB]);
+    Serial.print(loopData.outsideTemperature);
     Serial.print(F("  Rx Byte 3: "));
     Serial.print(radio.DATA[3]);
     Serial.print(F("  Rx Byte 4: "));
@@ -261,10 +238,10 @@ void processPacket() {
 #endif
     break;
   case 0xa0:
-    loopData[OUTSIDE_HUMIDITY] = (float)(word((radio.DATA[4] >> 4), radio.DATA[3])) / 10.0;
+    loopData.outsideHumidity = (float)(word((radio.DATA[4] >> 4), radio.DATA[3])) / 10.0;
 #if O
     Serial.print("Outside Humdity: ");
-    Serial.print(loopData[OUTSIDE_HUMIDITY]);
+    Serial.print(loopData.outsideHumidity);
     Serial.print("  Rx Byte 3: ");
     Serial.print(radio.DATA[3]);
     Serial.print("  Rx Byte 4: ");
@@ -280,28 +257,24 @@ void processPacket() {
 
 // Indoor temperature and humidity is read once per minute
 void readInsideTempHum() {
-  int insideTempF, insideTempC, insideHumidity;
+  int16_t insideTempC, insideHumidity;
   if (tempHum.reading(insideTempC, insideHumidity, true)) {
     // Temperature and humidity are returned in tenths of a deg C and tenths of a percent, respectively
     // Values out of the console are tenths of a deg F and integer percent values.  PITA.
-    insideTempF = insideTempC*1.8 + 320;
-    loopData[INSIDE_TEMPERATURE_MSB] =highByte(insideTempF);
-    loopData[INSIDE_TEMPERATURE_LSB] =lowByte(insideTempF);
-    loopData[INSIDE_HUMIDITY] = (insideHumidity + 5) * 0.1;  // Round the reading
+    loopData.insideTemperature = insideTempC*1.8 + 320;
+    loopData.insideHumidity = (insideHumidity + 5) * 0.1;  // Round the reading
 #if 0
-    Serial.print(F("Inside TempF: "));
-    Serial.print(insideTempF);
-    Serial.print(F("  MSB: "));
-    Serial.print(loopData[INSIDE_TEMPERATURE_MSB]);
-    Serial.print(F("  LSB: "));
-    Serial.println(loopData[INSIDE_TEMPERATURE_LSB]);
+    Serial.print(F("Inside TempC: "));
+    Serial.print(insideTempC);
+    Serial.print(F("  Loop Inside TempF: "));
+    Serial.println(loopData.insideTemperature);
     printFreeRam();
 #endif
 #if 0
     Serial.print(F("Inside Humidity Raw: "));
     Serial.print(insideHumidity);
     Serial.print(F("  Loop Value: "));
-    Serial.println(loopData[INSIDE_HUMIDITY]);
+    Serial.println(loopData.insideHumidity);
     printFreeRam();
 #endif
   }
@@ -310,17 +283,10 @@ void readInsideTempHum() {
 // Barometric pressure is read once per minute
 // Units from the BMP085 are Pa.  Need to convert to thousandths of inches of Hg.
 void readPressure() {
-  unsigned int pressureHg;
-  pressureHg = bmp.readPressure()*0.29529987508;
-  loopData[BAROMETER_MSB] =highByte(pressureHg);
-  loopData[BAROMETER_LSB] =lowByte(pressureHg);
+  loopData.barometer = bmp.readPressure()*0.29529987508;
 #if 0
   Serial.print(F("Pressure: "));
-  Serial.print(pressureHg);
-  Serial.print(F("  MSB: "));
-  Serial.print(loopData[BAROMETER_MSB]);
-  Serial.print(F("  LSB: "));
-  Serial.println(loopData[BAROMETER_LSB]);
+  Serial.println(loopData.barometer);
   printFreeRam();
 #endif
 }
@@ -332,13 +298,13 @@ void cmdBardata() {
   // TODO Allow entry of Elevation and BARCAL
   printOk();
   Serial.print(F("BAR "));
-  Serial.print(word(loopData[BAROMETER_MSB], loopData[BAROMETER_LSB]));
+  Serial.print(loopData.barometer);
   Serial.print(F("\n\rELEVATION "));
   Serial.print(ELEVATION);
   Serial.print(F("\n\rDEW POINT "));
-  Serial.print(word(loopData[OUTSIDE_TEMPERATURE_MSB], loopData[OUTSIDE_TEMPERATURE_LSB]));
+  Serial.print(loopData.outsideTemperature);
   Serial.print(F("\n\rVIRTUAL TEMP "));
-  Serial.print(word(loopData[OUTSIDE_TEMPERATURE_MSB], loopData[OUTSIDE_TEMPERATURE_LSB]));
+  Serial.print(loopData.outsideTemperature);
   Serial.print(F("\n\rC "));
   Serial.print(29);
   Serial.print(F("\n\rR "));
@@ -440,7 +406,6 @@ void cmdEebrd() {
 
 // We just don't have enough memory to support this.  Fail.
 void cmdHiLows() {
-  byte count = 0;
   printAck();
   for (int i = 0; i < HI_LOWS_LENGTH + 2; i++) Serial.write(0);
 }
@@ -461,12 +426,13 @@ void sendLoopPacket() {
   if (loopCount <= 0 || millis() - lastLoopTime < LOOP_INTERVAL) return;
   lastLoopTime = millis();
   loopCount--;
-  // Calculate the CRC over the entire length of the current packet with the exception of the
-  // last two bytes in the packet that hold the CRC itself.
-  unsigned int crc = radio.crc16_ccitt(loopData, LOOP_PACKET_LENGTH - 2);
-  loopData[CRC_MSB]=highByte(crc);
-  loopData[CRC_LSB]=lowByte(crc);
-  for (byte i = 0; i < LOOP_PACKET_LENGTH; i++) Serial.write(loopData[i]);
+  // Calculate the CRC over the entire length of the loop packet.
+  byte *loopPtr = (byte *)&loopData;
+  unsigned int crc = radio.crc16_ccitt(loopPtr, sizeof(loopData));
+
+  for (byte i = 0; i < sizeof(loopData); i++) Serial.write(loopPtr[i]);
+  Serial.write(highByte(crc));
+  Serial.write(lowByte(crc));
 }
 
 void cmdNver() {
