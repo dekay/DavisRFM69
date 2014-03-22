@@ -48,6 +48,8 @@ DHTxx tempHum(DHT_DATA_PIN);
 RTC_DS3231 RTC;
 SerialCommand sCmd;
 
+LoopData testloop;
+
 byte loopData[LOOP_PACKET_LENGTH] = {
   'L', 'O', 'O', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Loop packet bytes  0 - 15
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,        // Loop packet bytes 16 - 31
@@ -72,7 +74,7 @@ void setup() {
 #ifdef IS_RFM69HW
   radio.setHighPower(); //uncomment only for RFM69HW!
 #endif
-
+Serial.println(sizeof(testloop));
   // Set up BMP085 pressure and temperature sensor
   if (!bmp.begin()) {
     Serial.println(F("Could not find a valid BMP085 sensor, check wiring!"));
