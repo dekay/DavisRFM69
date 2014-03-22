@@ -58,8 +58,6 @@ byte loopData[LOOP_PACKET_LENGTH] = {
   '\r', 0, 0                                             // Loop packet bytes 96 - 98
 };
 
-unsigned int packetStats[PACKET_STATS_LENGTH] = {0, 0, 0, 0 ,0};
-
 volatile bool oneMinutePassed = false;
 
 void rtcInterrupt(void) {
@@ -162,16 +160,16 @@ void loop() {
   // fixing, but it needs to stay until the fix is in.
   // TODO Reset the packet statistics at midnight once I get my clock module.
   if (radio.receiveDone()) {
-    packetStats[PACKETS_RECEIVED]++;
+    packetStats.packetsReceived++;
     unsigned int crc = radio.crc16_ccitt(radio.DATA, 6);
     if ((crc == (word(radio.DATA[6], radio.DATA[7]))) && (crc != 0)) {
       processPacket();
-      packetStats[RECEIVED_STREAK]++;
+      packetStats.receivedStreak++;
       hopCount = 1;
       blink(LED,3);
     } else {
-      packetStats[CRC_ERRORS]++;
-      packetStats[RECEIVED_STREAK] = 0;
+      packetStats.crcErrors++;
+      packetStats.receivedStreak = 0;
     }
 
     if (strmon) printStrm();
@@ -195,8 +193,8 @@ void loop() {
   // of packet stats as we go.  I consider a consecutive string of missed
   // packets to be a single resync.  Thx to Kobuki for this algorithm.
   if ((hopCount > 0) && ((millis() - lastRxTime) > (hopCount * PACKET_INTERVAL + 200))) {
-    packetStats[PACKETS_MISSED]++;
-    if (hopCount == 1) packetStats[NUM_RESYNCS]++;
+    packetStats.packetsMissed++;
+    if (hopCount == 1) packetStats.numResyncs++;
     if (++hopCount > 25) hopCount = 0;
     radio.hop();
   }
@@ -478,9 +476,10 @@ void cmdNver() {
 void cmdRxcheck() {
   printAck();
   printOk();
-  for (byte i = 0; i < PACKET_STATS_LENGTH; i++) {
+  uint16_t *statsPtr = (uint16_t *)&packetStats;
+  for (byte i = 0; i < (sizeof(packetStats) >> 1); i++) {
     Serial.print(F(" "));          // Note. The real console has this leading space.
-    Serial.print(packetStats[i]);
+    Serial.print(statsPtr[i]);
   }
   Serial.print(F("\n\r"));
 }

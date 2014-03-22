@@ -179,6 +179,19 @@ static const uint8_t __attribute__ ((progmem)) FRF[DAVIS_FREQ_TABLE_LENGTH][3] =
 #error ** ERROR DAVIS_FREQS MUST BE DEFINED AS ONE OF _US, _EU, _AZ, or NZ **
 #endif  // DAVIS_FREQS
 
+// For the packet stats structure used in response to the RXCHECK command
+
+struct __attribute__((packed)) PacketStats
+{
+  uint16_t packetsReceived;
+  uint16_t packetsMissed;
+  uint16_t numResyncs;
+  uint16_t receivedStreak;
+  uint16_t crcErrors;
+};
+
+static PacketStats packetStats = {0, 0, 0, 0 ,0};
+
 // archive record type for DMP and DMPAFT commands
 struct __attribute__((packed)) ArchiveRec
 {

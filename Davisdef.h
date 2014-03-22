@@ -72,14 +72,6 @@
 #define CRC_MSB 97
 #define CRC_LSB 98
 
-// For the packet stats array used in response to the RXCHECK command
-#define PACKET_STATS_LENGTH 5
-#define PACKETS_RECEIVED 0
-#define PACKETS_MISSED 1
-#define NUM_RESYNCS 2
-#define RECEIVED_STREAK 3
-#define CRC_ERRORS 4
-
 // For the HiLows array.
 #define HI_LOWS_LENGTH 436
 
