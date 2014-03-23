@@ -27,7 +27,7 @@
 #define EEPROM_UNIT_BITS        0x29
 #define EEPROM_SETUP_BITS       0x2B
 #define EEPROM_RAIN_YEAR_START  0x2C
-#define EEPROM_ARCHIVE_PERIOD   0X2D
+#define EEPROM_ARCHIVE_PERIOD   0x2D
 
 // Daylight savings time mode set in EEPROM location 0x12
 #define DST_USE_MODE_AUTO    0

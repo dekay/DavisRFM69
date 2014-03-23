@@ -17,6 +17,7 @@
 
 #include <DavisRFM69.h>
 #include <DHTxx.h>
+#include <EEPROM.h>
 #include <SPI.h>
 #include <SPIFlash.h>
 #include <Wire.h>
@@ -87,12 +88,14 @@ void setup() {
 
   // Setup callbacks for SerialCommand commands
   sCmd.addCommand("BARDATA", cmdBardata);   // Barometer calibration data
+  sCmd.addCommand("CLRLOG", cmdClrlog);     // Erase entire flash chip on Moteino
   sCmd.addCommand("DUMPREG", cmdDumpreg);   // Dump radio registers - undocumented command
   sCmd.addCommand("EEBRD", cmdEebrd);       // EEPROM Read
   sCmd.addCommand("HILOWS", cmdHiLows);     // Send the HILOW data
   sCmd.addCommand("LOOP", cmdLoop);         // Send the loop data
   sCmd.addCommand("NVER", cmdNver);         // Send the version string
   sCmd.addCommand("RXCHECK", cmdRxcheck);   // Receiver Stats check
+  sCmd.addCommand("SETPER", cmdSetper);     // Set archive interval period
   sCmd.addCommand("STRMOFF", cmdStrmoff);   // Disable printing of received packet data
   sCmd.addCommand("STRMON", cmdStrmon);     // Enable printing of received packet data
   sCmd.addCommand("TEST", cmdTest);         // Echo's "TEST"
@@ -103,6 +106,10 @@ void setup() {
   sCmd.addCommand("DMPAFT", cmdDmpaft);     // Download archive records after date:time specified
   sCmd.setDefaultHandler(cmdUnrecognized);  // Handler for command that isn't matched
   sCmd.setNullHandler(cmdWake);             // Handler for an empty line to wake the simulated console
+
+#if 0
+  printFreeRam();
+#endif
 }
 
 // See https://github.com/dekay/im-me/blob/master/pocketwx/src/protocol.txt
@@ -315,12 +322,20 @@ void cmdBardata() {
   Serial.print(F("\n\rGAIN 1\n\rOFFSET 0\n\r"));
 }
 
+void cmdClrlog() {
+  printAck();
+  flash.chipErase();
+}
+
 void cmdDumpreg() {
   radio.readAllRegs();
   Serial.println();
 }
 
 void cmdEebrd() {
+  // TODO This is in the middle of a transition and will need to be reworked at
+  // some point.  The idea is to use the real Moteino EEPROM to store this
+  // stuff.  See the EEPROM_ARCHIVE_PERIOD for a start.
   char *cmdMemLocation, *cmdNumBytes;
   byte response[2] = {0, 0};
   byte responseLength = 0;
@@ -381,9 +396,10 @@ void cmdEebrd() {
       responseLength = 1;
       break;
     case EEPROM_ARCHIVE_PERIOD:
-      // TODO We don't actually implement archiving yet, and when we do, this value needs to sync
-      // with the actual archive period being used.
-      response[0] = ARCHIVE_PERIOD_MINS_10;
+      // TODO We don't actually implement archiving yet
+      // Once everything is in EEPROM, we just need the number of bytes
+      // for each special memory location rather than this stupid case statement.
+      response[0] = EEPROM.read(EEPROM_ARCHIVE_PERIOD);
       responseLength = 1;
       break;
     default:
@@ -394,8 +410,7 @@ void cmdEebrd() {
     if (validCommand) {
       unsigned int crc = radio.crc16_ccitt(response, responseLength);
       printAck();
-      for (byte i = 0; i < responseLength; i++)
-        Serial.write(response[i]);
+      for (byte i = 0; i < responseLength; i++) Serial.write(response[i]);
       Serial.write(highByte(crc));
       Serial.write(lowByte(crc));
     }
@@ -450,6 +465,27 @@ void cmdRxcheck() {
     Serial.print(statsPtr[i]);
   }
   Serial.print(F("\n\r"));
+}
+
+void cmdSetper() {
+  char *period;
+  period = sCmd.next();
+  if (period != NULL) {
+    byte minutes = strtol(period, NULL, 10);
+    if (minutes != EEPROM.read(EEPROM_ARCHIVE_PERIOD)) {
+      // The console erases the flash chip if the archive period is changed
+      // so that all records in the flash have the same interval.
+      flash.chipErase();
+      EEPROM.write(EEPROM_ARCHIVE_PERIOD, strtol(period, NULL, 10));
+#if 0
+      Serial.print(F("New archive interval = "));
+      Serial.println(EEPROM.read(EEPROM_ARCHIVE_PERIOD));
+#endif
+    }
+    printAck();
+  } else {
+    printNack();
+  }
 }
 
 void cmdStrmoff() {
