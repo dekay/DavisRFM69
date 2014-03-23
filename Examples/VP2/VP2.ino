@@ -25,6 +25,11 @@
 #include <SerialCommand.h>
 #include <RTC_DS3231.h>       // From https://github.com/mizraith/RTClib
 
+// Reduce number of bogus compiler warnings
+// http://forum.arduino.cc/index.php?PHPSESSID=uakeh64e6f5lb3s35aunrgfjq1&topic=102182.msg766625#msg766625
+#undef PROGMEM
+#define PROGMEM __attribute__(( section(".progmem.data") ))
+
 // NOTE: *** One of DAVIS_FREQS_US, DAVIS_FREQS_EU, DAVIS_FREQS_AU, or
 // DAVIS_FREQS_NZ MUST be defined at the top of DavisRFM69.h ***
 
