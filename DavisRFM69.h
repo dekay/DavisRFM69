@@ -18,8 +18,8 @@
 // America) and EU frequencies are defined at this time.  Australia and New
 // Zealand are placeholders.  Note however that the frequencies for AU and NZ
 // are not known at this time.
-#define DAVIS_FREQS_US
-//#define DAVIS_FREQS_EU
+//#define DAVIS_FREQS_US
+#define DAVIS_FREQS_EU
 //#define DAVIS_FREQS_AU
 //#define DAVIS_FREQS_NZ
 
@@ -79,8 +79,13 @@ class DavisRFM69 {
     byte readReg(byte addr);
     void writeReg(byte addr, byte val);
     void readAllRegs();
+    void setTxMode(bool txMode);
+    void setUserInterrupt(void (*function)());
 
   protected:
+    static volatile bool txMode;
+    void (*userInterrupt)();
+
     void virtual interruptHandler();
     void sendFrame(const void* buffer, byte size);
     byte reverseBits(byte b);

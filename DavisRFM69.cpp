@@ -19,6 +19,7 @@ volatile byte DavisRFM69::_mode;       // current transceiver state
 volatile bool DavisRFM69::_packetReceived = false;
 volatile byte DavisRFM69::CHANNEL = 0;
 volatile int DavisRFM69::RSSI;   // RSSI measured immediately after payload reception
+volatile bool DavisRFM69::txMode = false;
 DavisRFM69* DavisRFM69::selfPointer;
 
 void DavisRFM69::initialize()
@@ -40,7 +41,7 @@ void DavisRFM69::initialize()
     // +20dBpaym formula: Pout=-11+OutputPower (with PA1 and PA2)** and high power PA settings (section 3.3.7 in datasheet)
     ///* 0x11 */ { REG_PALEVEL, RF_PALEVEL_PA0_ON | RF_PALEVEL_PA1_OFF | RF_PALEVEL_PA2_OFF | RF_PALEVEL_OUTPUTPOWER_11111},
     ///* 0x13 */ { REG_OCP, RF_OCP_ON | RF_OCP_TRIM_95 }, //over current protection (default is 95mA)
-    /* 0x18 */ { REG_LNA, RF_LNA_ZIN_50 | RF_LNA_GAINSELECT_AUTO}, // Not sure which is correct!
+    /* 0x18 */ { REG_LNA, RF_LNA_ZIN_50 | RF_LNA_GAINSELECT_AUTO }, // Not sure which is correct!
     // RXBW defaults are { REG_RXBW, RF_RXBW_DCCFREQ_010 | RF_RXBW_MANT_24 | RF_RXBW_EXP_5} (RxBw: 10.4khz)
     /* 0x19 */ { REG_RXBW, RF_RXBW_DCCFREQ_010 | RF_RXBW_MANT_20 | RF_RXBW_EXP_4 }, // Use 25 kHz BW (BitRate < 2 * RxBw)
     /* 0x1A */ { REG_AFCBW, RF_RXBW_DCCFREQ_010 | RF_RXBW_MANT_20 | RF_RXBW_EXP_3 }, // Use double the bandwidth during AFC as reception
@@ -56,7 +57,7 @@ void DavisRFM69::initialize()
     /* 0x29 */ { REG_RSSITHRESH, 170 }, //must be set to dBm = (-Sensitivity / 2) - default is 0xE4=228 so -114dBm
     /* 0x2a & 0x2b RegRxTimeout1 and 2, respectively */
     /* 0x2c RegPreambleMsb - use zero default */
-    /* 0x2d */ { REG_PREAMBLELSB, 4 }, // Davis has four preamble bytes 0xAAAAAAAA
+    /* 0x2d */ { REG_PREAMBLELSB, 0x4 }, // Davis has four preamble bytes 0xAAAAAAAA -- use 6 for TX for this setup
     /* 0x2e */ { REG_SYNCCONFIG, RF_SYNC_ON | RF_SYNC_FIFOFILL_AUTO | RF_SYNC_SIZE_2 | RF_SYNC_TOL_2 },  // Allow a couple erros in the sync word
     /* 0x2f */ { REG_SYNCVALUE1, 0xcb }, // Davis ISS first sync byte. http://madscientistlabs.blogspot.ca/2012/03/first-you-get-sugar.html
     /* 0x30 */ { REG_SYNCVALUE2, 0x89 }, // Davis ISS second sync byte.
@@ -92,6 +93,7 @@ void DavisRFM69::initialize()
   attachInterrupt(0, DavisRFM69::isr0, RISING);
 
   selfPointer = this;
+  userInterrupt = NULL;
 }
 
 void DavisRFM69::interruptHandler() {
@@ -105,6 +107,7 @@ void DavisRFM69::interruptHandler() {
     for (byte i = 0; i < DAVIS_PACKET_LEN; i++) DATA[i] = reverseBits(SPI.transfer(0));
 
     _packetReceived = true;
+    if (userInterrupt != NULL) (*userInterrupt)();
     unselect();  // Unselect RFM69 module, enabling interrupts
   }
 }
@@ -122,7 +125,8 @@ bool DavisRFM69::canSend()
 void DavisRFM69::send(const void* buffer, byte bufferSize)
 {
   writeReg(REG_PACKETCONFIG2, (readReg(REG_PACKETCONFIG2) & 0xFB) | RF_PACKET2_RXRESTART); // avoid RX deadlocks
-  while (!canSend()) receiveDone();
+  // the next line would cause problems for this setup, keep commented out for now
+  //while (!canSend()) receiveDone();
   sendFrame(buffer, bufferSize);
 }
 
@@ -159,7 +163,7 @@ void DavisRFM69::setChannel(byte channel)
   writeReg(REG_FRFMSB, pgm_read_byte(&FRF[CHANNEL][0]));
   writeReg(REG_FRFMID, pgm_read_byte(&FRF[CHANNEL][1]));
   writeReg(REG_FRFLSB, pgm_read_byte(&FRF[CHANNEL][2]));
-  receiveBegin();
+  if (!txMode) receiveBegin();
 }
 
 void DavisRFM69::hop()
@@ -350,4 +354,19 @@ void DavisRFM69::rcCalibration()
 {
   writeReg(REG_OSC1, RF_OSC1_RCCAL_START);
   while ((readReg(REG_OSC1) & RF_OSC1_RCCAL_DONE) == 0x00);
+}
+
+void DavisRFM69::setTxMode(bool txMode)
+{
+  DavisRFM69::txMode = txMode;
+  if (txMode) {
+    writeReg(REG_PREAMBLELSB, 0x6);
+  } else {
+    writeReg(REG_PREAMBLELSB, 0x4);
+  }
+}
+
+void DavisRFM69::setUserInterrupt(void (*function)())
+{
+  userInterrupt = function;
 }
