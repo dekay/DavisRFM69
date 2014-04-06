@@ -165,4 +165,17 @@
 #define ARCHIVE_PERIOD_MINS_60   60
 #define ARCHIVE_PERIOD_MINS_120  120
 
+// Davis VP2 standalone station types
+#define STYPE_ISS         0x0 // ISS
+#define STYPE_TEMP_ONLY   0x1 // Temperature Only Station
+#define STYPE_HUM_ONLY    0x2 // Humidity Only Station
+#define STYPE_TEMP_HUM    0x3 // Temperature/Humidity Station
+#define STYPE_WLESS_ANEMO 0x4 // Wireless Anemometer Station
+#define STYPE_RAIN        0x5 // Rain Station
+#define STYPE_LEAF        0x6 // Leaf Station
+#define STYPE_SOIL        0x7 // Soil Station
+#define STYPE_SOIL_LEAF   0x8 // Soil/Leaf Station
+#define STYPE_SENSORLINK  0x9 // SensorLink Station (not supported for the VP2)
+#define STYPE_OFF         0xA // No station – OFF
+
 #endif  // DAVISDEF_h
