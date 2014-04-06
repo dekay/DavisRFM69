@@ -659,7 +659,7 @@ void handleTimerInt() {
   // that is, find missed packets
   for (byte i = 0; i < NUM_STATIONS; i++) {
     if (stations[i].interval > 0 && (lastRx - stations[i].lastRx) > stations[i].interval + LATE_PACKET_THRESH) {
-      if (stations[curStation].active) packetStats.packetsMissed++;
+      if (stationsFound == NUM_STATIONS && stations[curStation].active) packetStats.packetsMissed++;
       stations[i].lostPackets++;
       if (stations[i].lostPackets > RESYNC_THRESHOLD) {
         stationsFound = 0;
@@ -667,7 +667,7 @@ void handleTimerInt() {
         initStations();
         return;
       } else {
-        stations[i].lastRx += stations[i].interval; // where packet should have been received
+        stations[i].lastRx += stations[i].interval; // when packet should have been received
         stations[i].channel = nextChannel(stations[i].channel); // skip station's next channel in hop seq
         readjust = true;
       }
@@ -738,11 +738,11 @@ void handleRadioInt() {
       
       // Phase 2: normal reception
       // 8 received packet bytes (without the crc) are stored in the fifo/ring buffer along with the RSSI
-      if (stations[curStation].active) {
+      if (stationsFound == NUM_STATIONS && stations[curStation].active) {
         packetStats.receivedStreak++;
         fifo.queue(radio.DATA, -radio.RSSI);
       } else {
-        packetStats.packetsReceived--; // a packet arrived for a configured, but ignored station
+        packetStats.packetsReceived--; // a packet arrived in Phase 1 or for a configured, but ignored station
       }
 
       // successful reception - skip to next/earliest expected station
