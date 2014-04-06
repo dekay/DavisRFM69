@@ -665,6 +665,7 @@ void handleTimerInt() {
         stationsFound = 0;
         packetStats.numResyncs++;
         initStations();
+        return;
       } else {
         stations[i].lastRx += stations[i].interval; // where packet should have been received
         stations[i].channel = nextChannel(stations[i].channel); // skip station's next channel in hop seq
