@@ -30,6 +30,15 @@
 #undef PROGMEM
 #define PROGMEM __attribute__(( section(".progmem.data") ))
 
+// INT1 on AVRs should be connected to DS3231's SQW (ex on ATmega328 it's D3, on ATmega644/1284 it's D11)
+#if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) || defined(__AVR_ATmega88) || defined(__AVR_ATmega8__) || defined(__AVR_ATmega88__)
+  #define DS3231_IRQ_PIN 3
+  #define DS3231_IRQ_NUM 1
+#elif defined(__AVR_ATmega644P__) || defined(__AVR_ATmega1284P__)
+  #define DS3231_IRQ_PIN 11
+  #define DS3231_IRQ_NUM 1
+#endif
+
 // NOTE: *** One of DAVIS_FREQS_US, DAVIS_FREQS_EU, DAVIS_FREQS_AU, or
 // DAVIS_FREQS_NZ MUST be defined at the top of DavisRFM69.h ***
 
@@ -110,8 +119,7 @@ void setup() {
   RTC.enable32kHz(false);   // We don't even connect this pin
   RTC.SQWEnable(false);     // Disabling the square wave enables the alarm interrupt
   setAlarming();
-  // TODO does interrupt number need to change for the bigger Moteinos?
-  attachInterrupt(1, rtcInterrupt, FALLING);
+  attachInterrupt(DS3231_IRQ_NUM, rtcInterrupt, FALLING); // Untested on Moteino Mega
 
   // Setup callbacks for SerialCommand commands
   sCmd.addCommand("BARDATA", cmdBardata);   // Barometer calibration data
