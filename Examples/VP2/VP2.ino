@@ -15,14 +15,14 @@
 // transceiver module.  Note that RFM12B-based modules will not work.  See the README
 // for more details.
 
-#include <DavisRFM69.h>
+#include <DavisRFM69.h>       // From https://github.com/dekay/DavisRFM69 
 #include <DHTxx.h>
-#include <EEPROM.h>
-#include <SPI.h>
-#include <SPIFlash.h>
-#include <Wire.h>
+#include <EEPROM.h>           // From standard Arduino library
+#include <SPI.h>              // From standard Arduino library
+#include <SPIFlash.h>         // From https://github.com/LowPowerLab/SPIFlash
+#include <Wire.h>             // From standard Arduino library
 #include <Adafruit_BMP085.h>
-#include <SerialCommand.h>
+#include <SerialCommand.h>    // From https://github.com/dekay/Arduino-SerialCommand
 #include <RTC_DS3231.h>       // From https://github.com/mizraith/RTClib
 
 // Reduce number of bogus compiler warnings
@@ -34,21 +34,35 @@
 // DAVIS_FREQS_NZ MUST be defined at the top of DavisRFM69.h ***
 
 //#define IS_RFM69HW    //uncomment only for RFM69HW! Leave out if you have RFM69W!
-#define LED           9  // Moteinos have LEDs on D9
-#define SERIAL_BAUD   19200        // Davis console is 19200 by default
-#define SENSOR_POLL_INTERVAL 5000  // Read indoor sensors every minute. Console uses 60 seconds
+#define SERIAL_BAUD     19200 // Davis console is 19200 by default
+#define POLL_INTERVAL   5000  // Read indoor sensors every minute. Console uses 60 seconds
 
-#define DHT_DATA_PIN  4  // Use pin D4 to talk to the DHT22
-#define LATITUDE -1071   // Station latitude in tenths of degrees East
-#define LONGITUDE 541    // Station longitude in tenths of degrees North
-#define ELEVATION 800    // Station height above sea level in feet
+#define DHT_DATA_PIN    4     // Use pin D4 to talk to the DHT22
+#define LATITUDE       -1071  // Station latitude in tenths of degrees East
+#define LONGITUDE       541   // Station longitude in tenths of degrees North
+#define ELEVATION       800   // Station height above sea level in feet
 
 #define PACKET_INTERVAL 2555
-#define LOOP_INTERVAL 2500
+#define LOOP_INTERVAL   2500
+
+#ifdef __AVR_ATmega1284P__
+  #define LED           15    // Moteino MEGAs have LEDs on D15
+  #define FLASH_SS      23    // and FLASH SS on D23
+#else
+  #define LED           9     // Moteinos have LEDs on D9
+  #define FLASH_SS      8     // and FLASH SS on D8
+#endif
 
 boolean strmon = false;       // Print the packet when received?
 DavisRFM69 radio;
-SPIFlash flash(8, 0xEF30); //EF40 for 16mbit windbond chip
+
+// flash(FLASH_SS, MANUFACTURER_ID)
+//   FLASH_SS - SS pin attached to SPI flash chip (defined above)
+//   MANUFACTURER_ID - OPTIONAL
+//     0x1F44 for adesto(ex atmel) 4mbit flash
+//     0xEF30 for windbond 4mbit flash
+SPIFlash flash(FLASH_SS, 0xEF30);
+
 Adafruit_BMP085 bmp;
 DHTxx tempHum(DHT_DATA_PIN);
 RTC_DS3231 RTC;
@@ -65,15 +79,22 @@ void setup() {
   Serial.begin(SERIAL_BAUD);
   delay(10);
   radio.initialize();
-  radio.setChannel(0);              // Frequency / Channel is *not* set in the initialization. Do it right after.
+  radio.setChannel(0);  // Frequency / Channel *not* set in initialization. Do it right after.
 #ifdef IS_RFM69HW
-  radio.setHighPower(); //uncomment only for RFM69HW!
+  radio.setHighPower(); // Uncomment only for RFM69HW!
 #endif
   // Initialize the loop data array
   memcpy(&loopData, &loopInit, sizeof(loopInit));
+
   // Set up BMP085 pressure and temperature sensor
   if (!bmp.begin()) {
     Serial.println(F("Could not find a valid BMP085 sensor, check wiring!"));
+    while (1) { }
+  }
+
+  // Initialize the flash chip on the Moteino
+  if (!flash.initialize()) {
+    Serial.println(F("SPI Flash Init Failed. Is chip present and correct manufacturer specified in constructor?"));
     while (1) { }
   }
 
@@ -89,6 +110,7 @@ void setup() {
   RTC.enable32kHz(false);   // We don't even connect this pin
   RTC.SQWEnable(false);     // Disabling the square wave enables the alarm interrupt
   setAlarming();
+  // TODO does interrupt number need to change for the bigger Moteinos?
   attachInterrupt(1, rtcInterrupt, FALLING);
 
   // Setup callbacks for SerialCommand commands
@@ -139,10 +161,10 @@ void setup() {
 // - Wind speed 10 minute average every minute
 
 long lastPeriod = -1;
-unsigned long lastRxTime = 0;
-unsigned long lastLoopTime = 0;
-byte hopCount = 0;
-unsigned int loopCount = 0;
+uint32_t lastRxTime = 0;
+uint32_t lastLoopTime = 0;
+uint8_t hopCount = 0;
+uint16_t loopCount = 0;
 
 void loop() {
   if (Serial.available() > 0) loopCount = 0; // if we receive anything while sending LOOP packets, stop the stream
@@ -152,7 +174,7 @@ void loop() {
 
   sCmd.readSerial(); // Process serial commands
 
-  int currPeriod = millis()/SENSOR_POLL_INTERVAL;
+  int16_t currPeriod = millis()/POLL_INTERVAL;
 
   if (currPeriod != lastPeriod) {
     lastPeriod=currPeriod;
@@ -165,12 +187,12 @@ void loop() {
   // TODO Reset the packet statistics at midnight once I get my clock module.
   if (radio.receiveDone()) {
     packetStats.packetsReceived++;
-    unsigned int crc = radio.crc16_ccitt(radio.DATA, 6);
+    uint16_t crc = radio.crc16_ccitt(radio.DATA, 6);
     if ((crc == (word(radio.DATA[6], radio.DATA[7]))) && (crc != 0)) {
       processPacket();
       packetStats.receivedStreak++;
       hopCount = 1;
-      blink(LED,3);
+      blink(LED, 3);
     } else {
       packetStats.crcErrors++;
       packetStats.receivedStreak = 0;
@@ -180,7 +202,7 @@ void loop() {
 #if 0
     Serial.print(radio.CHANNEL);
     Serial.print(F(" - Data: "));
-    for (byte i = 0; i < DAVIS_PACKET_LEN; i++) {
+    for (uint8_t i = 0; i < DAVIS_PACKET_LEN; i++) {
       Serial.print(radio.DATA[i], HEX);
       Serial.print(F(" "));
     }
@@ -234,13 +256,14 @@ void processPacket() {
   Serial.println(loopData.transmitterBatteryStatus);
 #endif
 
-  // Now look at each individual packet. Mask off the four low order bits. The highest order bit of the
-  // four is set high when the ISS battery is low.  The low order three bits are the station ID.
+  // Now look at each individual packet. The high order nibble is the packet type.
+  // The highest order bit of the low nibble is set high when the ISS battery is low.
+  // The low order three bits of the low nibble are the station ID.
 
-  switch (radio.DATA[0] & 0xf0) {
-  case 0x80:
+  switch (radio.DATA[0] >> 4) {
+  case VP2P_TEMP:
     loopData.outsideTemperature = (int16_t)(word(radio.DATA[3], radio.DATA[4])) >> 4;
-#if 0
+#if 1
     Serial.print(F("Outside Temp: "));
     Serial.print(loopData.outsideTemperature);
     Serial.print(F("  Rx Byte 3: "));
@@ -249,7 +272,7 @@ void processPacket() {
     Serial.println(radio.DATA[4]);
 #endif
     break;
-  case 0xa0:
+  case VP2P_HUMIDITY:
     loopData.outsideHumidity = (float)(word((radio.DATA[4] >> 4), radio.DATA[3])) / 10.0;
 #if O
     Serial.print("Outside Humdity: ");
@@ -271,7 +294,7 @@ void processPacket() {
 void readInsideTempHum() {
   int16_t insideTempC, insideHumidity;
   if (tempHum.reading(insideTempC, insideHumidity, true)) {
-    // Temperature and humidity are returned in tenths of a deg C and tenths of a percent, respectively
+    // Temp and humidity are in tenths of a deg C and tenths of a percent, respectively
     // Values out of the console are tenths of a deg F and integer percent values.  PITA.
     loopData.insideTemperature = insideTempC*1.8 + 320;
     loopData.insideHumidity = (insideHumidity + 5) * 0.1;  // Round the reading
@@ -342,8 +365,8 @@ void cmdEebrd() {
   // some point.  The idea is to use the real Moteino EEPROM to store this
   // stuff.  See the EEPROM_ARCHIVE_PERIOD for a start.
   char *cmdMemLocation, *cmdNumBytes;
-  byte response[2] = {0, 0};
-  byte responseLength = 0;
+  uint8_t response[2] = {0, 0};
+  uint8_t responseLength = 0;
   bool validCommand = true;
 
   cmdMemLocation = sCmd.next();
@@ -387,11 +410,11 @@ void cmdEebrd() {
       response[0] = GMT_OR_ZONE_USE_INDEX;
       responseLength = 1;
       break;
-    case EEPROM_UNIT_BITS:  // Memory location for setup bits. Assume one byte is being asked for.
+    case EEPROM_UNIT_BITS:  // Memory location for setup bits. Assume one byte is asked for.
       response[0] = BAROMETER_UNITS_IN | TEMP_UNITS_TENTHS_F | ELEVATION_UNITS_FEET | RAIN_UNITS_IN | WIND_UNITS_MPH;
       responseLength = 1;
       break;
-    case EEPROM_SETUP_BITS:  // Memory location for setup bits. Assume one byte is being asked for.
+    case EEPROM_SETUP_BITS:  // Memory location for setup bits. Assume one byte is asked for.
       // TODO The AM / PM indication isn't set yet.  Need my clock chip first.
       response[0] = LONGITUDE_WEST | LATITUDE_NORTH | RAIN_COLLECTOR_01IN | WIND_CUP_LARGE | MONTH_DAY_MONTHDAY | AMPM_TIME_MODE_24H;
       responseLength = 1;
@@ -413,9 +436,9 @@ void cmdEebrd() {
     }
 
     if (validCommand) {
-      unsigned int crc = radio.crc16_ccitt(response, responseLength);
+      uint16_t crc = radio.crc16_ccitt(response, responseLength);
       printAck();
-      for (byte i = 0; i < responseLength; i++) Serial.write(response[i]);
+      for (uint8_t i = 0; i < responseLength; i++) Serial.write(response[i]);
       Serial.write(highByte(crc));
       Serial.write(lowByte(crc));
     }
@@ -427,7 +450,7 @@ void cmdEebrd() {
 // We just don't have enough memory to support this.  Fail.
 void cmdHiLows() {
   printAck();
-  for (int i = 0; i < HI_LOWS_LENGTH + 2; i++) Serial.write(0);
+  for (uint16_t i = 0; i < HI_LOWS_LENGTH + 2; i++) Serial.write(0);
 }
 
 void cmdLoop() {
@@ -447,10 +470,10 @@ void sendLoopPacket() {
   lastLoopTime = millis();
   loopCount--;
   // Calculate the CRC over the entire length of the loop packet.
-  byte *loopPtr = (byte *)&loopData;
-  unsigned int crc = radio.crc16_ccitt(loopPtr, sizeof(loopData));
+  uint8_t *loopPtr = (uint8_t *)&loopData;
+  uint16_t crc = radio.crc16_ccitt(loopPtr, sizeof(loopData));
 
-  for (byte i = 0; i < sizeof(loopData); i++) Serial.write(loopPtr[i]);
+  for (uint8_t i = 0; i < sizeof(loopData); i++) Serial.write(loopPtr[i]);
   Serial.write(highByte(crc));
   Serial.write(lowByte(crc));
 }
@@ -466,7 +489,7 @@ void cmdRxcheck() {
   printOk();
   uint16_t *statsPtr = (uint16_t *)&packetStats;
   for (byte i = 0; i < (sizeof(packetStats) >> 1); i++) {
-    Serial.print(F(" "));          // Note. The real console has this leading space.
+    Serial.print(F(" ")); // Note. The real console has this leading space.
     Serial.print(statsPtr[i]);
   }
   Serial.print(F("\n\r"));
@@ -476,7 +499,7 @@ void cmdSetper() {
   char *period;
   period = sCmd.next();
   if (period != NULL) {
-    byte minutes = strtol(period, NULL, 10);
+    uint8_t minutes = strtol(period, NULL, 10);
     if (minutes != EEPROM.read(EEPROM_ARCHIVE_PERIOD)) {
       // The console erases the flash chip if the archive period is changed
       // so that all records in the flash have the same interval.
@@ -525,7 +548,7 @@ void cmdWRD() {
 // ><0><27><15><4><6><103><2 Bytes<<ACK><2 bytes of CRC>
 // <<ACK>
 void cmdGettime() {
-  byte davisDateTime[6];
+  uint8_t davisDateTime[6];
   printAck();
   DateTime now = RTC.now();
   davisDateTime[0] = now.second();
@@ -542,24 +565,24 @@ void cmdGettime() {
   }
   Serial.println();
 #endif
-  unsigned int crc = radio.crc16_ccitt(davisDateTime, 6);
+  uint16_t crc = radio.crc16_ccitt(davisDateTime, 6);
   Serial.write(davisDateTime, 6);
   Serial.write(highByte(crc));
   Serial.write(lowByte(crc));
 }
 
 void cmdSettime() {
-  byte davisDateTime[8];
+  uint8_t davisDateTime[8];
   printAck();
-  // delay(2000);    Why were these delays here if read() is blocking? Kobuki code bug?
+  delay(2000);  // This delay is needed by the console. 
   // Read six bytes for time and another two bytes for CRC
-  for (byte i = 0; i < 8; i++) {
+  for (uint8_t i = 0; i < 8; i++) {
     davisDateTime[i] = Serial.read();
     // delay(200);
   }
 
   // Set the time only if the CRC is OK
-  unsigned int crc = radio.crc16_ccitt(davisDateTime, 6);
+  uint16_t crc = radio.crc16_ccitt(davisDateTime, 6);
   if (crc == (word(davisDateTime[6], davisDateTime[7]))) {
     printAck();
     RTC.adjust(DateTime(davisDateTime[5] + 1900, davisDateTime[4], davisDateTime[3], \
@@ -571,19 +594,20 @@ void cmdSettime() {
 
 void cmdDmpaft() {
   printAck();
-  // read 2 byte vantageDateStamp, the 2 byte vantageTimeStamp, and a 2 byte CRC
+  // Read 2 byte vantageDateStamp, the 2 byte vantageTimeStamp, and a 2 byte CRC
   while (Serial.available() <= 0);
-  for (byte i = 0; i < 6; i++) Serial.read();
+  for (uint8_t i = 0; i < 6; i++) Serial.read();
   printAck();
 
   // From Davis' docs:
-  //   Each archive record is 52 bytes. Records are sent to the PC in 264 byte pages. Each page
+  //   Each archive record is 52 bytes. Records sent to the PC in 264 byte pages. Each page
   //   contains 5 archive records and 4 unused bytes.
 
-  // send the number of "pages" that will be sent (2 bytes), the location within the first page of the first record, and 2 Byte CRC
-  byte response[4] = { 1, 0, 0, 0 }; // L,H;L,H -- 1 page; first record is #0
-  unsigned int crc = radio.crc16_ccitt(response, 4);
-  for (byte i = 0; i < 4; i++)
+  // Send the number of "pages" that will be sent (2 bytes), the location within the first
+  // page of the first record, and 2 Byte CRC
+  uint8_t response[4] = { 1, 0, 0, 0 }; // L,H;L,H -- 1 page; first record is #0
+  uint16_t crc = radio.crc16_ccitt(response, 4);
+  for (uint8_t i = 0; i < 4; i++)
     Serial.write(response[i]);
   Serial.write(highByte(crc));
   Serial.write(lowByte(crc));
@@ -598,12 +622,12 @@ void cmdDmpaft() {
   response[0] = 0;
   crc = radio.crc16_ccitt(response, 1);
   Serial.write(0);
-  byte * farp = (byte *)&fakeArchiveRec;
-  for (byte i = 0; i < 5; i++) {
+  uint8_t * farp = (uint8_t *)&fakeArchiveRec;
+  for (uint8_t i = 0; i < 5; i++) {
     crc = radio.crc16_ccitt(farp, sizeof(fakeArchiveRec), crc);
-    for (byte j = 0; j < sizeof(fakeArchiveRec); j++) Serial.write(farp[j]);
+    for (uint8_t j = 0; j < sizeof(fakeArchiveRec); j++) Serial.write(farp[j]);
   }
-  for (byte i = 0; i < 4; i++) Serial.write(0);
+  for (uint8_t i = 0; i < 4; i++) Serial.write(0);
   crc = radio.crc16_ccitt(response, 4, crc);
   Serial.write(highByte(crc));
   Serial.write(lowByte(crc));
@@ -618,7 +642,7 @@ void cmdUnrecognized(const char *command) {
   printOk();
 }
 
-//--- Print related support functions ---//
+// Print related support functions
 void printAck() {
   Serial.write(0x06);
 }
@@ -630,9 +654,9 @@ void printNack() {
 // From http://jeelabs.org/2011/05/22/atmega-memory-use/
 void printFreeRam() {
   extern int __heap_start, *__brkval;
-  int v;
+  int16_t v;
   Serial.print(F("Free mem: "));
-  Serial.println((int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval));
+  Serial.println((int16_t) &v - (__brkval == 0 ? (int16_t) &__heap_start : (int16_t) __brkval));
 }
 
 void printOk() {
@@ -640,7 +664,7 @@ void printOk() {
 }
 
 void printStrm() {
-  for (byte i = 0; i < DAVIS_PACKET_LEN; i++) {
+  for (uint8_t i = 0; i < DAVIS_PACKET_LEN; i++) {
     Serial.print(i);
     Serial.print(" = ");
     Serial.print(radio.DATA[i], HEX);
@@ -649,8 +673,8 @@ void printStrm() {
   Serial.print(F("\n\r"));
 }
 
-//--- Ancillary functions ---//
-void blink(byte PIN, int DELAY_MS)
+// Ancillary functions
+void blink(uint8_t PIN, uint16_t DELAY_MS)
 {
   pinMode(PIN, OUTPUT);
   digitalWrite(PIN,HIGH);
@@ -667,7 +691,7 @@ void setAlarming()
   Wire.write(static_cast<uint8_t>(DS3231_REG_CONTROL));
   Wire.endTransmission();
 
-  // control register
+  // Control register
   Wire.requestFrom(DS3231_ADDRESS, 1);
   uint8_t creg = Wire.read();     //do we need the bcd2bin
 
@@ -703,3 +727,5 @@ void clearAlarmInterrupt()
   Wire.write(static_cast<uint8_t>(0b00000000));
   Wire.endTransmission();
 }
+
+// vim: et:sts=2:ts=2:sw=2

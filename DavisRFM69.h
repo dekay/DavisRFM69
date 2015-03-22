@@ -26,75 +26,127 @@
 #include <Davisdef.h>
 #include <Arduino.h>            //assumes Arduino IDE v1.0 or greater
 
-#define DAVIS_PACKET_LEN      8 // ISS has fixed packet lengths of eight bytes, including CRC
-#define SPI_CS               SS // SS is the SPI slave select pin, for instance D10 on atmega328
-#define RF69_IRQ_PIN          2 // INT0 on AVRs should be connected to DIO0 (ex on Atmega328 it's D2)
-#define CSMA_LIMIT          -90 // upper RX signal sensitivity threshold in dBm for carrier sense access
-#define RF69_MODE_SLEEP       0 // XTAL OFF
-#define RF69_MODE_STANDBY     1 // XTAL ON
-#define RF69_MODE_SYNTH       2 // PLL ON
-#define RF69_MODE_RX          3 // RX MODE
-#define RF69_MODE_TX          4 // TX MODE
+#define DAVIS_PACKET_LEN    10 // ISS has fixed packet length of 10 bytes, including CRC and retransmit CRC
+#define RF69_SPI_CS         SS // SS is the SPI slave select pin, for instance D10 on ATmega328
 
-#define null                  0
+// INT0 on AVRs should be connected to RFM69's DIO0 (ex on ATmega328 it's D2, on ATmega644/1284 it's D2)
+#if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) || defined(__AVR_ATmega88) || defined(__AVR_ATmega8__) || defined(__AVR_ATmega88__)
+  #define RF69_IRQ_PIN 2
+  #define RF69_IRQ_NUM 0
+#elif defined(__AVR_ATmega644P__) || defined(__AVR_ATmega1284P__)
+  #define RF69_IRQ_PIN 2
+  #define RF69_IRQ_NUM 2
+#elif defined(__AVR_ATmega32U4__)
+  #define RF69_IRQ_PIN 3
+  #define RF69_IRQ_NUM 0
+#endif
+
+#define CSMA_LIMIT          -90 // upper RX signal sensitivity threshold in dBm for carrier sense access
+#define RF69_MODE_SLEEP     0 // XTAL OFF
+#define RF69_MODE_STANDBY   1 // XTAL ON
+#define RF69_MODE_SYNTH     2 // PLL ON
+#define RF69_MODE_RX        3 // RX MODE
+#define RF69_MODE_TX        4 // TX MODE
+
+// available frequency bands
+#define RF69_315MHZ         31 // non trivial values to avoid misconfiguration
+#define RF69_433MHZ         43
+#define RF69_868MHZ         86
+#define RF69_915MHZ         91
+
+#define null                0
 #define COURSE_TEMP_COEF    -90 // puts the temperature reading in the ballpark, user can fine tune the returned value
+
+// These values aren't in the upstream version of RF69registers.h
+#define REG_TESTAFC         0x71
+
+#define RF_FDEVMSB_4800     0x00 // Used for Davis console reception
+#define RF_FDEVLSB_4800     0x4e
+#define RF_FDEVMSB_9900     0x00 // Used for Davis ISS transmission
+#define RF_FDEVLSB_9900     0xa1
+
+// Davis VP2 standalone station types, defined by kobuki
+#define STYPE_ISS           0x0 // ISS
+#define STYPE_TEMP_ONLY     0x1 // Temperature Only Station
+#define STYPE_HUM_ONLY      0x2 // Humidity Only Station
+#define STYPE_TEMP_HUM      0x3 // Temperature/Humidity Station
+#define STYPE_WLESS_ANEMO   0x4 // Wireless Anemometer Station
+#define STYPE_RAIN          0x5 // Rain Station
+#define STYPE_LEAF          0x6 // Leaf Station
+#define STYPE_SOIL          0x7 // Soil Station
+#define STYPE_SOIL_LEAF     0x8 // Soil/Leaf Station
+#define STYPE_SENSORLINK    0x9 // SensorLink Station (not supported for the VP2)
+#define STYPE_OFF           0xA // No station - OFF
+
+// Davis packet types, also defined by kobuki
+#define VP2P_UV             0x4 // UV index
+#define VP2P_RAINSECS       0x5 // seconds between rain bucket tips
+#define VP2P_SOLAR          0x6 // solar irradiation
+#define VP2P_TEMP           0x8 // outside temperature
+#define VP2P_WINDGUST       0x9 // 10-minute wind gust
+#define VP2P_HUMIDITY       0xA // outside humidity
+#define VP2P_RAIN           0xE // rain bucket tips counter
 
 class DavisRFM69 {
   public:
-    static volatile byte DATA[DAVIS_PACKET_LEN];  // recv/xmit buf, including header, CRC, and RSSI value
-    static volatile byte _mode; //should be protected?
+    static volatile uint8_t DATA[DAVIS_PACKET_LEN];  // recv/xmit buf, including header, CRC
+    static volatile uint8_t _mode; //should be protected?
     static volatile bool _packetReceived;
-    static volatile byte CHANNEL;
-    static volatile int RSSI;
+    static volatile uint8_t CHANNEL;
+    static volatile int16_t RSSI;
 
-    DavisRFM69(byte slaveSelectPin=SPI_CS, byte interruptPin=RF69_IRQ_PIN, bool isRFM69HW=false) {
+    DavisRFM69(uint8_t slaveSelectPin=RF69_SPI_CS, uint8_t interruptPin=RF69_IRQ_PIN, bool isRFM69HW=false, uint8_t interruptNum=RF69_IRQ_NUM) {
       _slaveSelectPin = slaveSelectPin;
       _interruptPin = interruptPin;
+      _interruptNum = interruptNum;
       _mode = RF69_MODE_STANDBY;
       _packetReceived = false;
       _powerLevel = 31;
       _isRFM69HW = isRFM69HW;
     }
 
-    void send(byte toAddress, const void* buffer, byte bufferSize, bool requestACK=false);
-    static volatile byte hopIndex;
-    void setChannel(byte channel);
+    void send(uint8_t toAddress, const void* buffer, uint8_t bufferSize, bool requestACK=false);
+    static volatile uint8_t hopIndex;
+    void setChannel(uint8_t channel);
     void hop();
-    unsigned int crc16_ccitt(volatile byte *buf, byte len, unsigned int initCrc = 0);
+    uint16_t crc16_ccitt(volatile uint8_t *buf, uint8_t len, uint16_t initCrc = 0);
 
     void initialize();
     bool canSend();
-    void send(const void* buffer, byte bufferSize);
+    void send(const void* buffer, uint8_t bufferSize);
     bool receiveDone();
     void setFrequency(uint32_t FRF);
-    void setCS(byte newSPISlaveSelect);
-    int readRSSI(bool forceTrigger=false);
-    void setHighPower(bool onOFF=true); //have to call it after initialize for RFM69HW
-    void setPowerLevel(byte level); //reduce/increase transmit power level
+    void setCS(uint8_t newSPISlaveSelect);
+    int16_t readRSSI(bool forceTrigger=false);
+    void setHighPower(bool onOFF=true); // Have to call it after initialize for RFM69HW
+    void setPowerLevel(uint8_t level);  // Reduce/increase transmit power level
     void sleep();
-    byte readTemperature(byte calFactor=0); //get CMOS temperature (8bit)
+    uint8_t readTemperature(uint8_t calFactor=0); // Get CMOS temperature (8bit)
     void rcCalibration(); //calibrate the internal RC oscillator for use in wide temperature variations - see datasheet section [4.3.5. RC Timer Accuracy]
 
     // allow hacking registers by making these public
-    byte readReg(byte addr);
-    void writeReg(byte addr, byte val);
+    uint8_t readReg(uint8_t addr);
+    void writeReg(uint8_t addr, uint8_t val);
     void readAllRegs();
 
   protected:
     void virtual interruptHandler();
-    void sendFrame(const void* buffer, byte size);
-    byte reverseBits(byte b);
+    void sendFrame(const void* buffer, uint8_t size);
+    uint8_t reverseBits(uint8_t b);
 
     static void isr0();
 
     static DavisRFM69* selfPointer;
-    byte _slaveSelectPin;
-    byte _interruptPin;
-    byte _powerLevel;
+    uint8_t _slaveSelectPin;
+    uint8_t _interruptPin;
+    uint8_t _interruptNum;
+    uint8_t _powerLevel;
     bool _isRFM69HW;
+    uint8_t _SPCR;
+    uint8_t _SPSR;
 
     void receiveBegin();
-    void setMode(byte mode);
+    void setMode(uint8_t mode);
     void setHighPowerRegs(bool onOff);
     void select();
     void unselect();
@@ -200,47 +252,47 @@ static PacketStats packetStats = {0, 0, 0, 0 ,0};
 // WARNING: Many of the items below are not implemented!!!
 struct __attribute__((packed)) LoopPacket
 {
-  char loo[3];          // "LOO" at packet start indicates Rev B packet type
-  byte barTrend;        // Barometric trend
-  byte packetType;      // Packet type, always zero
-  uint16_t nextRecord;  // Location in archive memory where next packet will be written
-  uint16_t barometer;   // Current barometer in Hg / 1000
-  int16_t insideTemperature;  // Inside temperature in tenths of degrees
-  byte insideHumidity;        // Inside relative humidity in percent
-  int16_t outsideTemperature; // Outside temperature in tenths of degrees
-  byte windSpeed;             // Wind speed in miles per hour
-  byte tenMinAvgWindSpeed;    // Average wind speed over last ten minutes
-  uint16_t windDirection;     // Wind direction from 1 to 360 degrees (0 = no wind data)
-  byte extraTemperatures[7];  // Temps from seven extra stations in whole degrees F offset by 90
-  byte soilTemperatures[4];   // Soil temps from four extra sensors.  Format as above.
-  byte leafTemperatures[4];   // Leaf temps from four extra sensors.  Format as above.
-  byte outsideHumidity;       // Outside relative humidity in %.
-  byte extraHumidities[7];    // Relative humidity in % from seven extra stations.
-  uint16_t rainRate;          // Rain rate as number of rain clicks per hour (e.g 256 = 2.56 in/hr)
-  byte uV;                    // UV index
-  uint16_t solarRadiation;    // Solar radiation in Watts/m^2
-  uint16_t stormRain;         // Storm rain stored as hundredths of an inch
-  uint16_t startDateOfStorm;  // Bits 15-12 is month, bits 11-7 is day, and bits 6-0 is year offset by 2000
-  uint16_t dayRain;           // Rain today sent as number of rain clicks (0.2mm or 0.01in)
-  uint16_t monthRain;         // Rain this month sent as number of rain clicks (0.2mm or 0.01in)
-  uint16_t yearRain;          // Rain this year sent as number of rain clicks (0.2mm or 0.01in)
-  uint16_t dayET;             // ET today sent as thousandths of an inch
-  uint16_t monthET;           // ET this month sent as hundredths of an inch
-  uint16_t yearET;            // ET this year sent as hundredths of an inch
-  byte soilMoistures[4];      // Soil moisture in centibars from up to four soil sensors
-  byte leafWetnesses[4];      // A scale number from 0-15. 0 means very dry, 15 very wet. Supports four leaf sensors.
-  byte insideAlarms;          // Currently active inside alarms.
-  byte rainAlarms;            // Currently active rain alarms.
-  uint16_t outsideAlarms;     // Currently active outside alarms.
-  byte extraTempHumAlarms[8]; // Currently active temperature / humidity alarms for up to eight stations.
-  byte soilLeafAlarms[4];     // Currently active soil and leaf alarms for up to four sensors
-  byte transmitterBatteryStatus;  // Transmitter battery status (0 or 1)
-  uint16_t consoleBatteryVoltage; // Console voltage as  ((Data * 300)/512)/100.0
-  byte forecastIcons;             // Forecast icons
-  byte forecastRuleNumber;        // Forecast rule number
-  uint16_t timeOfSunrise;         // Sunrise time stored as hour * 100 + min.
-  uint16_t timeOfSunset;          // Sunset time stored as hour * 100 + min.
-  char lfcr[2];                   // Carriage return / line feed
+  char      loo[3];      // "LOO" at packet start indicates Rev B packet type
+  uint8_t   barTrend;    // Barometric trend
+  uint8_t   packetType;  // Packet type, always zero
+  uint16_t  nextRecord;  // Location in archive memory where next packet will be written
+  uint16_t  barometer;   // Current barometer in Hg / 1000
+  int16_t   insideTemperature;  // Inside temperature in tenths of degrees
+  uint8_t   insideHumidity;     // Inside relative humidity in percent
+  int16_t   outsideTemperature; // Outside temperature in tenths of degrees
+  uint8_t   windSpeed;          // Wind speed in miles per hour
+  uint8_t   tenMinAvgWindSpeed; // Average wind speed over last ten minutes
+  uint16_t  windDirection;      // Wind direction from 1 to 360 degrees (0 = no wind data)
+  uint8_t   extraTemperatures[7];  // Temps from seven extra stations in whole degrees F offset by 90
+  uint8_t   soilTemperatures[4];   // Soil temps from four extra sensors.  Format as above.
+  uint8_t   leafTemperatures[4];   // Leaf temps from four extra sensors.  Format as above.
+  uint8_t   outsideHumidity;       // Outside relative humidity in %.
+  uint8_t   extraHumidities[7];    // Relative humidity in % from seven extra stations.
+  uint16_t  rainRate;          // Rain rate as number of rain clicks per hour (e.g 256 = 2.56 in/hr)
+  uint8_t   uV;                // UV index
+  uint16_t  solarRadiation;    // Solar radiation in Watts/m^2
+  uint16_t  stormRain;         // Storm rain stored as hundredths of an inch
+  uint16_t  startDateOfStorm;  // Bits 15-12 is month, bits 11-7 is day, and bits 6-0 is year offset by 2000
+  uint16_t  dayRain;           // Rain today sent as number of rain clicks (0.2mm or 0.01in)
+  uint16_t  monthRain;         // Rain this month sent as number of rain clicks (0.2mm or 0.01in)
+  uint16_t  yearRain;          // Rain this year sent as number of rain clicks (0.2mm or 0.01in)
+  uint16_t  dayET;             // ET today sent as thousandths of an inch
+  uint16_t  monthET;           // ET this month sent as hundredths of an inch
+  uint16_t  yearET;            // ET this year sent as hundredths of an inch
+  uint8_t   soilMoistures[4];  // Soil moisture in centibars from up to four soil sensors
+  uint8_t   leafWetnesses[4];  // A scale number from 0-15. 0 means very dry, 15 very wet. Supports four leaf sensors.
+  uint8_t   insideAlarms;      // Currently active inside alarms.
+  uint8_t   rainAlarms;        // Currently active rain alarms.
+  uint16_t  outsideAlarms;     // Currently active outside alarms.
+  uint8_t   extraTempHumAlarms[8]; // Currently active temperature / humidity alarms for up to eight stations.
+  uint8_t   soilLeafAlarms[4];     // Currently active soil and leaf alarms for up to four sensors
+  uint8_t   transmitterBatteryStatus;  // Transmitter battery status (0 or 1)
+  uint16_t  consoleBatteryVoltage; // Console voltage as  ((Data * 300)/512)/100.0
+  uint8_t   forecastIcons;         // Forecast icons
+  uint8_t   forecastRuleNumber;    // Forecast rule number
+  uint16_t  timeOfSunrise;         // Sunrise time stored as hour * 100 + min.
+  uint16_t  timeOfSunset;          // Sunset time stored as hour * 100 + min.
+  char      lfcr[2];               // Carriage return / line feed
 };
 
 // Initializer for the LOOP packet.  Static const so it goes into flash.
@@ -292,49 +344,49 @@ static const LoopPacket loopInit =
 // archive record type for DMP and DMPAFT commands
 struct __attribute__((packed)) ArchiveRec
 {
-  uint16_t dateStamp;
-  uint16_t timeStamp;
-  int16_t outsideTemp;
-  int16_t highOutTemp;
-  int16_t lowOutTemp;
-  uint16_t rainfall;
-  uint16_t highRainRate;
-  uint16_t barometer;
-  uint16_t solarRad;
-  uint16_t windSamples;
-  int16_t insideTemp;
-  byte    insideHum;
-  byte    outsideHum;
-  byte    avgWindSpd;
-  byte    highWindSpd;
-  byte    dirHiWindSpd;
-  byte    prevWindDir;
-  byte    avgUVIndex;
-  byte    eT;
-  int16_t highSolarRad;
-  byte    highUVIdx;
-  byte    forecastRule;
-  byte    leafTemp0;
-  byte    leafTemp1;
-  byte    leafWet0;
-  byte    leafWet1;
-  byte    soilTemp0;
-  byte    soilTemp1;
-  byte    soilTemp2;
-  byte    soilTemp3;
-  byte    recType;
-  byte    extraHum0;
-  byte    extraHum1;
-  byte    extraTemp0;
-  byte    extraTemp1;
-  byte    extraTemp2;
-  byte    soilMoist0;
-  byte    soilMoist1;
-  byte    soilMoist2;
-  byte    soilMoist3;
+  uint16_t  dateStamp;
+  uint16_t  timeStamp;
+  int16_t   outsideTemp;
+  int16_t   highOutTemp;
+  int16_t   lowOutTemp;
+  uint16_t  rainfall;
+  uint16_t  highRainRate;
+  uint16_t  barometer;
+  uint16_t  solarRad;
+  uint16_t  windSamples;
+  int16_t   insideTemp;
+  uint8_t   insideHum;
+  uint8_t   outsideHum;
+  uint8_t   avgWindSpd;
+  uint8_t   highWindSpd;
+  uint8_t   dirHiWindSpd;
+  uint8_t   prevWindDir;
+  uint8_t   avgUVIndex;
+  uint8_t   eT;
+  int16_t   highSolarRad;
+  uint8_t   highUVIdx;
+  uint8_t   forecastRule;
+  uint8_t   leafTemp0;
+  uint8_t   leafTemp1;
+  uint8_t   leafWet0;
+  uint8_t   leafWet1;
+  uint8_t   soilTemp0;
+  uint8_t   soilTemp1;
+  uint8_t   soilTemp2;
+  uint8_t   soilTemp3;
+  uint8_t   recType;
+  uint8_t   extraHum0;
+  uint8_t   extraHum1;
+  uint8_t   extraTemp0;
+  uint8_t   extraTemp1;
+  uint8_t   extraTemp2;
+  uint8_t   soilMoist0;
+  uint8_t   soilMoist1;
+  uint8_t   soilMoist2;
+  uint8_t   soilMoist3;
 };
 
-// fake archive record (temporary)
+// Fake archive record (temporary)
 static const ArchiveRec fakeArchiveRec =
 {
   26 + 2 * 32 + (2014 - 2000) * 512,
@@ -380,3 +432,6 @@ static const ArchiveRec fakeArchiveRec =
 };
 
 #endif  // DAVISRFM_h
+
+// vim: et:sts=2:ts=2:sw=2
+

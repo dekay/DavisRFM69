@@ -166,3 +166,5 @@
 #define ARCHIVE_PERIOD_MINS_120  120
 
 #endif  // DAVISDEF_h
+
+// vim: et:sts=2:ts=2:sw=2
