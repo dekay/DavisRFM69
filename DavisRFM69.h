@@ -19,7 +19,7 @@
 // America) and EU frequencies are defined at this time.  Australia and New
 // Zealand are placeholders.  Note however that the frequencies for AU and NZ
 // are not known at this time.
-#define DAVIS_FREQS_US
+//#define DAVIS_FREQS_US
 //#define DAVIS_FREQS_EU
 //#define DAVIS_FREQS_AU
 //#define DAVIS_FREQS_NZ
@@ -46,6 +46,9 @@
   // See http://www.esp8266.com/viewtopic.php?f=32&t=4694
   #define RF69_IRQ_PIN 5
   #define RF69_IRQ_NUM 5
+#elif defined(ARDUINO_ARCH_STM32F1)
+  #define RF69_IRQ_PIN PA0
+  #define RF69_IRQ_NUM 0
 #endif
 
 #define CSMA_LIMIT          -90 // upper RX signal sensitivity threshold in dBm for carrier sense access
