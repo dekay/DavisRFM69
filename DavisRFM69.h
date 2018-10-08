@@ -1,9 +1,10 @@
 // Driver definition for HopeRF RFM69W/RFM69HW, Semtech SX1231/1231H used for
 // compatibility with the frequency hopped, spread spectrum signals from a Davis Instrument
-// wireless Integrated Sensor Suite (ISS)
+// wireless Integrated Sensor Suite (ISS).  This library has been tested against both the
+// Moteino from LowPowerLab, and an ESP-12E wired directly to an RFM69W module.
 //
 // This is part of the DavisRFM69 library from https://github.com/dekay/DavisRFM69
-// (C) DeKay 2014 dekaymail@gmail.com
+// (C) DeKay 2014-2016 dekaymail@gmail.com
 //
 // As I consider this to be a derived work from the RFM69W library from LowPowerLab,
 // it is released under the same Creative Commons Attrib Share-Alike License
@@ -18,7 +19,7 @@
 // America) and EU frequencies are defined at this time.  Australia and New
 // Zealand are placeholders.  Note however that the frequencies for AU and NZ
 // are not known at this time.
-#define DAVIS_FREQS_US
+//#define DAVIS_FREQS_US
 //#define DAVIS_FREQS_EU
 //#define DAVIS_FREQS_AU
 //#define DAVIS_FREQS_NZ
@@ -26,9 +27,10 @@
 #include <Davisdef.h>
 #include <Arduino.h>            //assumes Arduino IDE v1.0 or greater
 
-#define DAVIS_PACKET_LEN    10 // ISS has fixed packet length of 10 bytes, including CRC and retransmit CRC
-#define RF69_SPI_CS         SS // SS is the SPI slave select pin, for instance D10 on ATmega328
-
+#define DAVIS_PACKET_LEN 10 // ISS has fixed packet length of 10 bytes,
+                            // including CRC and retransmit CRC
+#define RF69_SPI_CS  SS     // SS is the SPI slave select pin
+                            // For instance D10 on ATmega328
 // INT0 on AVRs should be connected to RFM69's DIO0 (ex on ATmega328 it's D2, on ATmega644/1284 it's D2)
 #if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) || defined(__AVR_ATmega88) || defined(__AVR_ATmega8__) || defined(__AVR_ATmega88__)
   #define RF69_IRQ_PIN 2
@@ -38,6 +40,14 @@
   #define RF69_IRQ_NUM 2
 #elif defined(__AVR_ATmega32U4__)
   #define RF69_IRQ_PIN 3
+  #define RF69_IRQ_NUM 0
+#elif defined(ESP8266)
+  // ESP interrupt number and pin number are a direct relation
+  // See http://www.esp8266.com/viewtopic.php?f=32&t=4694
+  #define RF69_IRQ_PIN 5
+  #define RF69_IRQ_NUM 5
+#elif defined(ARDUINO_ARCH_STM32F1)
+  #define RF69_IRQ_PIN PA0
   #define RF69_IRQ_NUM 0
 #endif
 
@@ -109,6 +119,7 @@ class DavisRFM69 {
     static volatile uint8_t hopIndex;
     void setChannel(uint8_t channel);
     void hop();
+    void waitHere();
     uint16_t crc16_ccitt(volatile uint8_t *buf, uint8_t len, uint16_t initCrc = 0);
 
     void initialize();

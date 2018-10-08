@@ -1,9 +1,10 @@
 // Driver implementation for HopeRF RFM69W/RFM69HW, Semtech SX1231/1231H used for
 // compatibility with the frequency hopped, spread spectrum signals from a Davis Instrument
-// wireless Integrated Sensor Suite (ISS)
+// wireless Integrated Sensor Suite (ISS).  This library has been tested against both the
+// Moteino from LowPowerLab, and an ESP-12E wired directly to an RFM69W module.
 //
 // This is part of the DavisRFM69 library from https://github.com/dekay/DavisRFM69
-// (C) DeKay 2014 dekaymail@gmail.com
+// (C) DeKay 2014-2015 dekaymail@gmail.com
 //
 // As I consider this to be a derived work for now from the RFM69W library from LowPowerLab,
 // it is released under the same Creative Commons Attrib Share-Alike License
@@ -18,7 +19,7 @@ volatile uint8_t  DavisRFM69::DATA[DAVIS_PACKET_LEN];
 volatile uint8_t  DavisRFM69::_mode;  // current transceiver state
 volatile bool     DavisRFM69::_packetReceived = false;
 volatile uint8_t  DavisRFM69::CHANNEL = 0;
-volatile int16_t  DavisRFM69::RSSI;   // RSSI measured immediately after payload reception
+volatile int16_t  DavisRFM69::RSSI;   // RSSI measured after packet data read
 DavisRFM69*       DavisRFM69::selfPointer;
 
 void DavisRFM69::initialize()
@@ -31,13 +32,13 @@ void DavisRFM69::initialize()
     /* 0x04 */ { REG_BITRATELSB, RF_BITRATELSB_19200},
     /* 0x05 */ { REG_FDEVMSB, RF_FDEVMSB_4800}, // Davis uses a deviation of 4.8 kHz on Rx
     /* 0x06 */ { REG_FDEVLSB, RF_FDEVLSB_4800},
-    /* 0x07 to 0x09 are REG_FRFMSB to LSB. No sense setting them here. Done in main routine.
+    // 0x07 to 0x09 are REG_FRFMSB to LSB. No sense setting them here. Done in main routine.
     /* 0x0B */ { REG_AFCCTRL, RF_AFCCTRL_LOWBETA_OFF }, // TODO: Should use LOWBETA_ON, but having trouble getting it working
     // looks like PA1 and PA2 are not implemented on RFM69W, hence the max output power is 13dBm
     // +17dBm and +20dBm are possible on RFM69HW
     // +13dBm formula: Pout=-18+OutputPower (with PA0 or PA1**)
     // +17dBm formula: Pout=-14+OutputPower (with PA1 and PA2)**
-    // +20dBpaym formula: Pout=-11+OutputPower (with PA1 and PA2)** and high power PA settings (section 3.3.7 in datasheet)
+    // +20dBm formula: Pout=-11+OutputPower (with PA1 and PA2)** and high power PA settings (section 3.3.7 in datasheet)
     ///* 0x11 */ { REG_PALEVEL, RF_PALEVEL_PA0_ON | RF_PALEVEL_PA1_OFF | RF_PALEVEL_PA2_OFF | RF_PALEVEL_OUTPUTPOWER_11111},
     ///* 0x13 */ { REG_OCP, RF_OCP_ON | RF_OCP_TRIM_95 }, //over current protection (default is 95mA)
     /* 0x18 */ { REG_LNA, RF_LNA_ZIN_50 | RF_LNA_GAINSELECT_AUTO}, // Not sure which is correct!
@@ -57,7 +58,7 @@ void DavisRFM69::initialize()
     /* 0x2a & 0x2b RegRxTimeout1 and 2, respectively */
     /* 0x2c RegPreambleMsb - use zero default */
     /* 0x2d */ { REG_PREAMBLELSB, 4 }, // Davis has four preamble bytes 0xAAAAAAAA
-    /* 0x2e */ { REG_SYNCCONFIG, RF_SYNC_ON | RF_SYNC_FIFOFILL_AUTO | RF_SYNC_SIZE_2 | RF_SYNC_TOL_2 },  // Allow a couple erros in the sync word
+    /* 0x2e */ { REG_SYNCCONFIG, RF_SYNC_ON | RF_SYNC_FIFOFILL_AUTO | RF_SYNC_SIZE_2 | RF_SYNC_TOL_2 },  // Allow a couple errors in the sync word
     /* 0x2f */ { REG_SYNCVALUE1, 0xcb }, // Davis ISS first sync byte. http://madscientistlabs.blogspot.ca/2012/03/first-you-get-sugar.html
     /* 0x30 */ { REG_SYNCVALUE2, 0x89 }, // Davis ISS second sync byte.
     /* 0x31 - 0x36  REG_SYNCVALUE3 - 8 not used */
@@ -78,22 +79,30 @@ void DavisRFM69::initialize()
   pinMode(_slaveSelectPin, OUTPUT);
   SPI.begin();
 
+  // Is the RFM69 module alive?
   do writeReg(REG_SYNCVALUE1, 0xaa); while (readReg(REG_SYNCVALUE1) != 0xaa);
   do writeReg(REG_SYNCVALUE1, 0x55); while (readReg(REG_SYNCVALUE1) != 0x55);
 
   for (uint8_t i = 0; CONFIG[i][0] != 255; i++)
     writeReg(CONFIG[i][0], CONFIG[i][1]);
 
-  setHighPower(_isRFM69HW); //called regardless if it's a RFM69W or RFM69HW
+  setHighPower(_isRFM69HW); // Called regardless if it's a RFM69W or RFM69HW
   setMode(RF69_MODE_STANDBY);
   while ((readReg(REG_IRQFLAGS1) & RF_IRQFLAGS1_MODEREADY) == 0x00); // Wait for ModeReady
+  pinMode(RF69_IRQ_PIN, INPUT);  
   attachInterrupt(_interruptNum, DavisRFM69::isr0, RISING);
+
+  rcCalibration();  // Perform the coarse cal in case we haven't done POR in a long time
 
   selfPointer = this;
 }
 
 void DavisRFM69::interruptHandler() {
-  RSSI = readRSSI();  // Read up front when it is most likely the carrier is still up
+// See https://github.com/esp8266/Arduino/issues/1020 for how user libraries with
+// interrupts can crash the ESP.  Better to be safe than sorry for now.
+#if defined(ESP8266)
+  ETS_GPIO_INTR_DISABLE();
+#endif
   if (_mode == RF69_MODE_RX && (readReg(REG_IRQFLAGS2) & RF_IRQFLAGS2_PAYLOADREADY))
   {
     setMode(RF69_MODE_STANDBY);
@@ -104,7 +113,11 @@ void DavisRFM69::interruptHandler() {
 
     _packetReceived = true;
     unselect();  // Unselect RFM69 module, enabling interrupts
+    RSSI = readRSSI();  // RSSI of last received packet remains available after reception
   }
+#if defined(ESP8266)
+  ETS_GPIO_INTR_ENABLE();
+#endif
 }
 
 bool DavisRFM69::canSend()
@@ -155,10 +168,16 @@ void DavisRFM69::setChannel(uint8_t channel)
 {
   CHANNEL = channel;
   if (CHANNEL > DAVIS_FREQ_TABLE_LENGTH - 1) CHANNEL = 0;
+  setMode(RF69_MODE_STANDBY);
   writeReg(REG_FRFMSB, pgm_read_byte(&FRF[CHANNEL][0]));
   writeReg(REG_FRFMID, pgm_read_byte(&FRF[CHANNEL][1]));
   writeReg(REG_FRFLSB, pgm_read_byte(&FRF[CHANNEL][2]));
   receiveBegin();
+}
+
+void DavisRFM69::waitHere()
+{
+  _packetReceived = false;
 }
 
 void DavisRFM69::hop()
@@ -202,7 +221,6 @@ void DavisRFM69::setFrequency(uint32_t FRF)
 
 void DavisRFM69::setMode(uint8_t newMode)
 {
-  //Serial.println(newMode);
   if (newMode == _mode) return;
 
   switch (newMode) {
@@ -229,11 +247,9 @@ void DavisRFM69::setMode(uint8_t newMode)
   // we are using packet mode, so this check is not really needed
   // but waiting for mode ready is necessary when going from sleep because the FIFO may not
   // be immediately available from previous mode
-  while (_mode == RF69_MODE_SLEEP && (readReg(REG_IRQFLAGS1) & RF_IRQFLAGS1_MODEREADY) == 0x00); // Wait for ModeReady
 
+  while (_mode == RF69_MODE_SLEEP && (readReg(REG_IRQFLAGS1) & RF_IRQFLAGS1_MODEREADY) == 0x00); // Wait for ModeReady
   _mode = newMode;
-  //Serial.print("Mode set to ");
-  //Serial.println(_mode);
 }
 
 void DavisRFM69::sleep() {
@@ -289,9 +305,13 @@ void DavisRFM69::writeReg(uint8_t addr, uint8_t value)
 // Select the transceiver
 void DavisRFM69::select() {
   noInterrupts();
-  // Save current SPI settings
+#if defined(ARDUINO_ARCH_AVR)
+  // Save current SPI settings on Moteino's.  That board has a SPI flash
+  // as well as a SPI interface to the RFM69, so you need to save the old
+  // SPI config before talking to the RFM69.  We aren't doing this on the ESP.
   _SPCR = SPCR;
   _SPSR = SPSR;
+#endif
   // Set RFM69 SPI settings
   SPI.setDataMode(SPI_MODE0);
   SPI.setBitOrder(MSBFIRST);
@@ -302,9 +322,12 @@ void DavisRFM69::select() {
 // Unselect the transceiver chip
 void DavisRFM69::unselect() {
   digitalWrite(_slaveSelectPin, HIGH);
-  // Restore SPI settings to what they were before talking to RFM69
+  // Restore SPI settings on Moteino to what they were before talking to RFM69.
+  // See comment in DavisRFM69::select() for why.
+#if defined(ARDUINO_ARCH_AVR)
   SPCR = _SPCR;
   SPSR = _SPSR;
+#endif
   interrupts();
 }
 
@@ -341,9 +364,9 @@ void DavisRFM69::readAllRegs()
     unselect();
 
     Serial.print(regAddr, HEX);
-    Serial.print(" - ");
+    Serial.print(F(" - "));
     Serial.print(regVal,HEX);
-    Serial.print(" - ");
+    Serial.print(F(" - "));
     Serial.println(regVal,BIN);
   }
   unselect();
@@ -353,7 +376,7 @@ uint8_t DavisRFM69::readTemperature(uint8_t calFactor)  // Returns centigrade
 {
   setMode(RF69_MODE_STANDBY);
   writeReg(REG_TEMP1, RF_TEMP1_MEAS_START);
-  while ((readReg(REG_TEMP1) & RF_TEMP1_MEAS_RUNNING)) Serial.print('*');
+  while ((readReg(REG_TEMP1) & RF_TEMP1_MEAS_RUNNING)) Serial.print(F("*"));
   return ~readReg(REG_TEMP2) + COURSE_TEMP_COEF + calFactor; //'complement'corrects the slope, rising temp = rising val
 } // COURSE_TEMP_COEF puts reading in the ballpark, user can add additional correction
 
