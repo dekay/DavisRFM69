@@ -289,9 +289,11 @@ void DavisRFM69::writeReg(uint8_t addr, uint8_t value)
 // Select the transceiver
 void DavisRFM69::select() {
   noInterrupts();
+#if defined (SPCR) && defined (SPSR)
   // Save current SPI settings
   _SPCR = SPCR;
   _SPSR = SPSR;
+#endif
   // Set RFM69 SPI settings
   SPI.setDataMode(SPI_MODE0);
   SPI.setBitOrder(MSBFIRST);
@@ -302,9 +304,11 @@ void DavisRFM69::select() {
 // Unselect the transceiver chip
 void DavisRFM69::unselect() {
   digitalWrite(_slaveSelectPin, HIGH);
+#if defined (SPCR) && defined (SPSR)
   // Restore SPI settings to what they were before talking to RFM69
   SPCR = _SPCR;
   SPSR = _SPSR;
+#endif
   interrupts();
 }
 
