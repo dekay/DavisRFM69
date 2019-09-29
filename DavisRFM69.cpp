@@ -31,7 +31,7 @@ void DavisRFM69::initialize()
     /* 0x04 */ { REG_BITRATELSB, RF_BITRATELSB_19200},
     /* 0x05 */ { REG_FDEVMSB, RF_FDEVMSB_4800}, // Davis uses a deviation of 4.8 kHz on Rx
     /* 0x06 */ { REG_FDEVLSB, RF_FDEVLSB_4800},
-    /* 0x07 to 0x09 are REG_FRFMSB to LSB. No sense setting them here. Done in main routine.
+    /* 0x07 to 0x09 are REG_FRFMSB to LSB. No sense setting them here. Done in main routine. */
     /* 0x0B */ { REG_AFCCTRL, RF_AFCCTRL_LOWBETA_OFF }, // TODO: Should use LOWBETA_ON, but having trouble getting it working
     // looks like PA1 and PA2 are not implemented on RFM69W, hence the max output power is 13dBm
     // +17dBm and +20dBm are possible on RFM69HW
