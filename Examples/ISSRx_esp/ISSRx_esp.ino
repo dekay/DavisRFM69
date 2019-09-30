@@ -23,9 +23,11 @@
 
 //#define IS_RFM69HW    //uncomment only for RFM69HW! Leave out if you have RFM69W!
 #define LED          16  // nodemcu have LEDs on 16
+#define LED2          2
 #define SERIAL_BAUD   115200
 #define PACKET_INTERVAL 2555
-boolean strmon = false;       // Print the packet when received?
+
+#define DEBUG
 
 DavisRFM69 radio;
 
@@ -59,7 +61,7 @@ void decode_packet(volatile uint8_t *buf)
       if (buf[3]!=0xff)
         Serial.println(rainr);
       else
-        Serial.println(F("no sensor"));
+        Serial.println(F("no rain"));
       break;
     case solarrad:
       float Solar_rad;
@@ -93,7 +95,7 @@ void decode_packet(volatile uint8_t *buf)
       gust_index = (buf[5] >> 4);
       Serial.print(F("gust="));
       Serial.print(gust);
-      Serial.print(F("gustindex="));
+      Serial.print(F(" gustindex="));
       Serial.println(gust_index);
       break;
     case humi:
@@ -176,16 +178,19 @@ void loop() {
       hopCount = 1;
       blink(LED,3);
       decode_packet(radio.DATA);
+#ifdef DEBUG
       Serial.print(F("crc ok  "));
+#endif
     } else {
-      Serial.print(F("crcfail "));
       packetStats.crcErrors++;
       packetStats.receivedStreak = 0;
-      delay(3);
+      blink(LED2,3);
+#ifdef DEBUG
+      Serial.print(F("crcfail "));
+#endif
     }
 
-    if (strmon) printStrm();
-#if 1
+#ifdef DEBUG
     Serial.print(radio.CHANNEL);
     Serial.print(F(" - Data: "));
     for (byte i = 0; i < DAVIS_PACKET_LEN; i++) {
@@ -196,8 +201,8 @@ void loop() {
     }
     Serial.print(F("  RSSI: "));
     Serial.println(radio.RSSI);
-    Serial.println();
 #endif
+    Serial.println();
     // Whether CRC is right or not, we count that as reception and hop.
     radio.hop();
   }
@@ -211,8 +216,10 @@ void loop() {
     if (hopCount == 1) packetStats.numResyncs++;
     if (++hopCount > 25) hopCount = 0;
     radio.hop();
+#ifdef DEBUG
     Serial.print(F("resync to ch "));
     Serial.println(radio.CHANNEL);
+#endif
   }
 }
 
