@@ -31,10 +31,14 @@ DavisRFM69 radio;
 
 void decode_packet(volatile uint8_t *buf)
 {
-//TODO: implement remaining packetdecoders
+//TODO: properly implement packetdecoders
   byte trans_id=0xff;
   switch(buf[0]& 0xF0){
     case cap_volt:
+      int voltage;
+      voltage = (((buf[3] * 4) + ((buf[4] && 0xC0) / 64)) / 100);
+      Serial.print(F("supercap_voltage="));
+      Serial.println(voltage);
       break;
     case uv_index:
       int UVIndex;
@@ -46,6 +50,16 @@ void decode_packet(volatile uint8_t *buf)
         Serial.println(F("no sensor"));
       break;
     case rainrate:
+      int rainr;
+      if ((buf[4] && 0x40) == 0)
+        rainr = (720 / (((buf[4] && 0x30) / 16 * 250) + buf[3]));
+      else
+        rainr = (11520 / (((buf[4] && 0x30) / 16 * 250) + buf[3]));
+      Serial.print(F("rainr="));
+      if (buf[3]!=0xff)
+        Serial.println(rainr);
+      else
+        Serial.println(F("no sensor"));
       break;
     case solarrad:
       float Solar_rad;
@@ -57,6 +71,10 @@ void decode_packet(volatile uint8_t *buf)
         Serial.println(F("no sensor"));
       break;
     case sol_volt:
+      int sol_voltage; 
+      sol_voltage = (((buf[3] * 4) + ((buf[4] && 0xC0) / 64)) / 100);
+      Serial.print(F("solar_voltage="));
+      Serial.println(sol_voltage);
       break;
     case temp:
       float tempF;
@@ -69,6 +87,14 @@ void decode_packet(volatile uint8_t *buf)
       Serial.println(tempC);
       break;
     case windgust:
+      byte gust;
+      byte gust_index;
+      gust = buf[3];
+      gust_index = (buf[5] >> 4);
+      Serial.print(F("gust="));
+      Serial.print(gust);
+      Serial.print(F("gustindex="));
+      Serial.println(gust_index);
       break;
     case humi:
       byte humidity;
