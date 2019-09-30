@@ -114,8 +114,16 @@ void decode_packet(volatile uint8_t *buf)
   }
   if (buf[0] & batlow)
     Serial.println(F("low battery"));
+  byte wind_speed;
+  byte wind_dir;
+  wind_speed=(buf[1]);
+  wind_dir=(buf[2]);
+  Serial.print(F("wind speed="));
+  Serial.print(wind_speed);
+  Serial.print(F(" wind direction="));
+  Serial.print(wind_dir);
   trans_id=(buf[0] & tr_id);
-  Serial.print(F("transmitter_id:"));
+  Serial.print(F(" transmitter_id="));
   Serial.println(trans_id);
 }
 
@@ -188,6 +196,7 @@ void loop() {
     }
     Serial.print(F("  RSSI: "));
     Serial.println(radio.RSSI);
+    Serial.println();
 #endif
     // Whether CRC is right or not, we count that as reception and hop.
     radio.hop();
