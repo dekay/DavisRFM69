@@ -17,6 +17,7 @@
 #include <DavisRFM69.h>
 #include <SPI.h>
 
+#include "davismessage.h"
 // NOTE: *** One of DAVIS_FREQS_US, DAVIS_FREQS_EU, DAVIS_FREQS_AU, or
 // DAVIS_FREQS_NZ MUST be defined at the top of DavisRFM69.h ***
 
@@ -27,6 +28,70 @@
 boolean strmon = false;       // Print the packet when received?
 
 DavisRFM69 radio;
+
+void decode_packet(volatile uint8_t *buf)
+{
+//TODO: implement remaining packetdecoders
+  byte trans_id=0xff;
+  switch(buf[0]& 0xF0){
+    case cap_volt:
+      break;
+    case uv_index:
+      int UVIndex;
+      UVIndex = ((((buf[3] << 8) + buf[4]) >> 6) / 50.0);
+      Serial.print(F("UVIndex="));
+      if (buf[3]!=0xff)
+        Serial.println(UVIndex);
+      else
+        Serial.println(F("no sensor"));
+      break;
+    case rainrate:
+      break;
+    case solarrad:
+      float Solar_rad;
+      Solar_rad = ((((buf[3] << 8) + buf[4]) >> 6) * 1.757936);
+      Serial.print(F("Solar_rad="));
+      if (buf[3]!=0xff)
+        Serial.println(Solar_rad);
+      else
+        Serial.println(F("no sensor"));
+      break;
+    case sol_volt:
+      break;
+    case temp:
+      float tempF;
+      tempF = ((buf[3] * 256 + buf[4]) / 160 );
+      Serial.print(F("tempF="));
+      Serial.print(tempF);
+      float tempC;
+      tempC = ((tempF-32)/1.8);
+      Serial.print(F(" tempC="));
+      Serial.println(tempC);
+      break;
+    case windgust:
+      break;
+    case humi:
+      byte humidity;
+      humidity = ((((buf[4] >> 4) << 8) + buf[3]) / 10.0);
+      Serial.print(F("humidity="));
+      Serial.println(humidity);
+      break;
+    case rain:
+      byte rainbuckets;
+      rainbuckets = (buf[3]&0x7F);
+      Serial.print(F("rainbuckettips="));
+      Serial.println(rainbuckets);
+      break;
+    default:
+      Serial.println(F("unknown packet type"));
+      break;
+  }
+  if (buf[0] & batlow)
+    Serial.println(F("low battery"));
+  trans_id=(buf[0] & tr_id);
+  Serial.print(F("transmitter_id:"));
+  Serial.println(trans_id);
+}
 
 void setup() {
   Serial.begin(SERIAL_BAUD);
@@ -73,10 +138,11 @@ void loop() {
     lastRxTime = millis();
     unsigned int crc = radio.crc16_ccitt(radio.DATA, 6);
     if ((crc == (word(radio.DATA[6], radio.DATA[7]))) && (crc != 0)) {
-      Serial.print(F("crc ok  "));
       packetStats.receivedStreak++;
       hopCount = 1;
       blink(LED,3);
+      decode_packet(radio.DATA);
+      Serial.print(F("crc ok  "));
     } else {
       Serial.print(F("crcfail "));
       packetStats.crcErrors++;
@@ -89,6 +155,8 @@ void loop() {
     Serial.print(radio.CHANNEL);
     Serial.print(F(" - Data: "));
     for (byte i = 0; i < DAVIS_PACKET_LEN; i++) {
+      if (radio.DATA[i]<0x10)
+        Serial.print(F("0"));
       Serial.print(radio.DATA[i], HEX);
       Serial.print(F(" "));
     }
@@ -126,7 +194,7 @@ void printStrm() {
 void blink(byte PIN, int DELAY_MS)
 {
   pinMode(PIN, OUTPUT);
-  digitalWrite(PIN,HIGH);
-  delay(DELAY_MS);
   digitalWrite(PIN,LOW);
+  delay(DELAY_MS);
+  digitalWrite(PIN,HIGH);
 }
