@@ -36,6 +36,7 @@ void setup() {
 #ifdef IS_RFM69HW
   radio.setHighPower(); //uncomment only for RFM69HW!
 #endif
+  Serial.println(F("\n\nDavisRFM69 Gateway - START"));
   Serial.println(F("\nWaiting for signal in region defined in DavisRFM69.h"));
 }
 
@@ -69,14 +70,18 @@ void loop() {
   // TODO Reset the packet statistics at midnight once I get my clock module.
   if (radio.receiveDone()) {
     packetStats.packetsReceived++;
+    lastRxTime = millis();
     unsigned int crc = radio.crc16_ccitt(radio.DATA, 6);
     if ((crc == (word(radio.DATA[6], radio.DATA[7]))) && (crc != 0)) {
+      Serial.print(F("crc ok  "));
       packetStats.receivedStreak++;
       hopCount = 1;
       blink(LED,3);
     } else {
+      Serial.print(F("crcfail "));
       packetStats.crcErrors++;
       packetStats.receivedStreak = 0;
+      delay(3);
     }
 
     if (strmon) printStrm();
@@ -86,13 +91,12 @@ void loop() {
     for (byte i = 0; i < DAVIS_PACKET_LEN; i++) {
       Serial.print(radio.DATA[i], HEX);
       Serial.print(F(" "));
-  }
-  Serial.print(F("  RSSI: "));
-  Serial.println(radio.RSSI);
+    }
+    Serial.print(F("  RSSI: "));
+    Serial.println(radio.RSSI);
 #endif
-  // Whether CRC is right or not, we count that as reception and hop.
-  lastRxTime = millis();
-  radio.hop();
+    // Whether CRC is right or not, we count that as reception and hop.
+    radio.hop();
   }
 
   // If a packet was not received at the expected time, hop the radio anyway
@@ -104,6 +108,8 @@ void loop() {
     if (hopCount == 1) packetStats.numResyncs++;
     if (++hopCount > 25) hopCount = 0;
     radio.hop();
+    Serial.print(F("resync to ch "));
+    Serial.println(radio.CHANNEL);
   }
 }
 
