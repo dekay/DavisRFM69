@@ -53,7 +53,7 @@ void DavisRFM69::initialize()
     /* 0x26 RegDioMapping2 */
     /* 0x27 RegIRQFlags1 */
     /* 0x28 */ { REG_IRQFLAGS2, RF_IRQFLAGS2_FIFOOVERRUN }, // Reset the FIFOs. Fixes a problem I had with bad first packet.
-    /* 0x29 */ { REG_RSSITHRESH, 170 }, //must be set to dBm = (-Sensitivity / 2) - default is 0xE4=228 so -114dBm
+    /* 0x29 */ { REG_RSSITHRESH, 120 }, //must be set to dBm = (-Sensitivity / 2) - default is 0xE4=228 so -114dBm
     /* 0x2a & 0x2b RegRxTimeout1 and 2, respectively */
     /* 0x2c RegPreambleMsb - use zero default */
     /* 0x2d */ { REG_PREAMBLELSB, 4 }, // Davis has four preamble bytes 0xAAAAAAAA
@@ -87,6 +87,7 @@ void DavisRFM69::initialize()
   setHighPower(_isRFM69HW); //called regardless if it's a RFM69W or RFM69HW
   setMode(RF69_MODE_STANDBY);
   while ((readReg(REG_IRQFLAGS1) & RF_IRQFLAGS1_MODEREADY) == 0x00); // Wait for ModeReady
+  pinMode(RF69_IRQ_PIN, INPUT);
   attachInterrupt(_interruptNum, DavisRFM69::isr0, RISING);
 
   selfPointer = this;
