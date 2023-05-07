@@ -27,7 +27,13 @@
 #include <Arduino.h>            //assumes Arduino IDE v1.0 or greater
 
 #define DAVIS_PACKET_LEN    10 // ISS has fixed packet length of 10 bytes, including CRC and retransmit CRC
-#define RF69_SPI_CS         SS // SS is the SPI slave select pin, for instance D10 on ATmega328
+
+#if not defined(ARDUINO_ARCH_ESP8266)
+  #define RF69_SPI_CS  SS      // SS is the SPI slave select pin, for instance D10 on ATmega328
+#else
+  #define RF69_SPI_CS  15      // slave select on nodemcu
+#endif
+
 
 // INT0 on AVRs should be connected to RFM69's DIO0 (ex on ATmega328 it's D2, on ATmega644/1284 it's D2)
 #if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) || defined(__AVR_ATmega88) || defined(__AVR_ATmega8__) || defined(__AVR_ATmega88__)
@@ -39,6 +45,9 @@
 #elif defined(__AVR_ATmega32U4__)
   #define RF69_IRQ_PIN 3
   #define RF69_IRQ_NUM 0
+#elif defined(ARDUINO_ARCH_ESP8266)
+  #define RF69_IRQ_PIN 5
+  #define RF69_IRQ_NUM digitalPinToInterrupt(RF69_IRQ_PIN)
 #endif
 
 #define CSMA_LIMIT          -90 // upper RX signal sensitivity threshold in dBm for carrier sense access
